@@ -14,6 +14,8 @@ Mods are Claude Code plugins built from function hooks: they sit on tool calls, 
 | `verify` | A gate for the main loop and every subagent: no "done" without a real check. Optionally runs only the tests related to each edit in the background and reports failures as they happen; that runs the project's own test scripts without a prompt, so it is off until you turn it on, and only covers projects inside the session's folder. | `liveTests` (or `/live-tests on` per session) |
 | `codex-ladder` | For people who drive the Codex CLI from Claude: keeps each run on an effort ladder (escalate a tier instead of retrying the same one, `max` only after `/codex-allow-max`), and checks briefs for DONE criteria, verification and a stop condition. | `defaultEffort`, `briefTemplate`, `blockFastTier` |
 
+`codex-ladder` reads effort from the command line; an effort it cannot read counts as `max`. It is a guardrail against mistakes, not a security boundary: a Codex profile or `~/.codex/config.toml` can set effort without the command showing it.
+
 ## Delegation
 
 | Mod | What it does | Works with |

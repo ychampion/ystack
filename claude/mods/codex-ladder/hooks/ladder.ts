@@ -25,7 +25,16 @@ export function parseCodex(command: string): CodexCall {
   // Every effort setting in the command; the highest wins (fail closed), so text in a prompt can only make the check stricter.
   const found = [...command.matchAll(/model_reasoning_effort\s*=\s*["']?(\w+)|--effort[=\s]+["']?(\w+)/g)].map(m => (m[1] ?? m[2] ?? '').toLowerCase())
   const known = found.map(asEffort).filter((x): x is Effort => x !== undefined)
-  const effort = found.includes('ultra') ? 'ultra' : known.length ? LADDER[Math.max(...known.map(x => LADDER.indexOf(x)))] : undefined
+  // A setting named in a form the pattern cannot read (quoted key, variable, escapes) counts as max: it needs the grant.
+  const mentions = command.match(/model_reasoning_effort|--effort\b/g)?.length ?? 0
+  const isUnreadable = mentions > found.length || found.some(v => v !== 'ultra' && asEffort(v) === undefined)
+  const effort = found.includes('ultra')
+    ? 'ultra'
+    : isUnreadable
+      ? 'max'
+      : known.length
+        ? LADDER[Math.max(...known.map(x => LADDER.indexOf(x)))]
+        : undefined
   const profile = command.match(/--profile[=\s]+["']?([\w-]+)/)?.[1]
   const hasServiceTier = /service_tier|--fast\b|priority_tier/.test(command)
   const briefFile =
