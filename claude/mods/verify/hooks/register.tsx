@@ -41,6 +41,10 @@ const roots = new Map<string, Root>()
 const notes = new Map<string, string[]>() // loop -> notes for its next tool result
 const tracked = new Map<string, { at: number; files: string[] }>()
 
+// Running a project's tests executes its own scripts with no permission prompt, so it is opt-in:
+// the liveTests setting, or /live-tests on for this session. Only projects inside the session's folder.
+let isLiveOn = false
+
 const say = (loop: string, text: string) => notes.set(loop, [...(notes.get(loop) ?? []), text])
 
 async function findRoot($: EngineInterface, file: string): Promise<{ root: string; manifest: Manifest } | undefined> {
@@ -126,9 +130,12 @@ async function onEdit($: EngineInterface, loop: string, file: string) {
   l.checksSinceEdit = 0
   l.liveAfterEdit = 'none'
   await update($, gate, g => ({ edits: g.edits + 1, checks: 0, files: [...new Set([...g.files, norm(file)])].slice(-50) }))
-  if (!CODE_FILE.test(file)) return
+  if (!isLiveOn || !CODE_FILE.test(file)) return
   const found = await findRoot($, file)
   if (!found) return
+  const sessionRoot = norm(await $.session.root()).replace(/\/+$/, '').toLowerCase()
+  const root = norm(found.root).toLowerCase()
+  if (root !== sessionRoot && !root.startsWith(`${sessionRoot}/`)) return
   let st = roots.get(found.root)
   if (!st) roots.set(found.root, (st = { isRunning: false, isPending: false, files: new Set(), owners: new Set(), lastSig: '', wasFailing: false }))
   st.files.add(norm(file))
@@ -154,7 +161,9 @@ async function hintFor($: EngineInterface, loop: string): Promise<string> {
   return `\`${suggestCheck(found?.manifest, typeof pkg === 'string' ? pkg : undefined)}\``
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  isLiveOn = options.liveTests === true
+
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'live-tests', description: 'Live related-test runner: open the pane, or `off` / `on`', argumentHint: '[on|off]' })
     return next(e)
@@ -163,8 +172,9 @@ export const register: Register = on => {
   on('command.run', { command: 'live-tests' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
     if (arg === 'off' || arg === 'on') {
+      isLiveOn = arg === 'on'
       await update($, isOff, () => arg === 'off')
-      return { text: `live-tests ${arg} for this session (per project: create or delete .claude/live-tests.off).` }
+      return { text: `live-tests ${arg} for this session (per project: create or delete .claude/live-tests.off; for every session: the liveTests setting in /config).` }
     }
     await $.ui.open({ id: PANE, title: 'Live tests' })
     return { text: 'Live tests pane opened.' }
@@ -233,10 +243,10 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
     const v = await read($, live)
-    const off = await read($, isOff)
+    const off = !isLiveOn || (await read($, isOff))
     return (
       <Box flexDirection="column">
-        <Text bold>{off ? 'off for this session' : v.status === 'idle' ? 'waiting for a code edit' : `${v.status} · ${v.label}`}</Text>
+        <Text bold>{off ? 'off (turn on with /live-tests on, or the liveTests setting)' : v.status === 'idle' ? 'waiting for a code edit' : `${v.status} · ${v.label}`}</Text>
         {v.root !== '' && <Text dimColor>{v.root}</Text>}
         {v.lines.map(l => (
           <Text>{l}</Text>

@@ -11,7 +11,7 @@ Mods are Claude Code plugins built from function hooks: they sit on tool calls, 
 | Mod | What it does | Settings |
 | --- | --- | --- |
 | `iron-rules` | Rewrites shell calls to house rules: `npm`/`npx` → `bun`/`bunx`, your commit identity on every commit, AI attribution stripped from commits and PRs, nested `cmd /c rmdir` blocked on Windows. | `gitName`, `gitEmail` (identity is added only when both are set), `useBun`, `noAttribution` |
-| `verify` | A gate for the main loop and every subagent: no "done" without a real check. Runs only the tests related to each edit in the background and reports failures as they happen. | — |
+| `verify` | A gate for the main loop and every subagent: no "done" without a real check. Optionally runs only the tests related to each edit in the background and reports failures as they happen; that runs the project's own test scripts without a prompt, so it is off until you turn it on, and only covers projects inside the session's folder. | `liveTests` (or `/live-tests on` per session) |
 | `codex-ladder` | For people who drive the Codex CLI from Claude: keeps each run on an effort ladder (escalate a tier instead of retrying the same one, `max` only after `/codex-allow-max`), and checks briefs for DONE criteria, verification and a stop condition. | `defaultEffort`, `briefTemplate`, `blockFastTier` |
 
 ## Delegation

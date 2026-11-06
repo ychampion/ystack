@@ -1,9 +1,17 @@
 {
   "name": "verify",
-  "version": "0.1.0",
-  "description": "Verify gate for the main loop and every subagent, plus a live runner of only the tests related to each edit; failing tests block a success claim.",
+  "version": "0.2.0",
+  "description": "Verify gate for the main loop and every subagent: no success claim without a real check. Optional live runner of only the tests related to each edit (opt-in: it runs the project's own test scripts).",
   "author": {
     "name": "ychampion"
   },
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "liveTests": {
+      "type": "boolean",
+      "title": "Run related tests after each edit",
+      "description": "Runs the project's own test command in the background, with no permission prompt, after Claude edits code inside the session's folder. Only turn on for projects you trust.",
+      "default": false
+    }
+  }
 }
