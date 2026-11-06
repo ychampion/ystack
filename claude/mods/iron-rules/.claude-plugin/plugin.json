@@ -1,0 +1,34 @@
+{
+  "name": "iron-rules",
+  "version": "0.2.0",
+  "description": "Enforces house rules on shell calls: bun instead of npm, your git commit identity, no AI attribution in commits and PRs, safe Windows deletes.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "gitName": {
+      "type": "string",
+      "title": "Git author name",
+      "description": "Added to every git commit, merge and rebase. Leave empty to keep git's own config.",
+      "default": ""
+    },
+    "gitEmail": {
+      "type": "string",
+      "title": "Git author email",
+      "description": "Used with the name above, e.g. your GitHub noreply address. Both must be set.",
+      "default": ""
+    },
+    "useBun": {
+      "type": "boolean",
+      "title": "Rewrite npm/npx to bun/bunx",
+      "description": "Rewrites npm/npx commands to bun/bunx before they run.",
+      "default": true
+    },
+    "noAttribution": {
+      "type": "boolean",
+      "title": "Strip AI attribution from commits and PRs",
+      "description": "Removes Co-Authored-By Claude and \"Generated with Claude Code\" lines from commit and PR text.",
+      "default": true
+    }
+  }
+}

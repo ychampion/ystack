@@ -1,0 +1,9 @@
+{
+  "name": "decision-inbox",
+  "version": "0.1.0",
+  "description": "A non-blocking ask tool for owner decisions from any session or subagent, one inbox pane to answer them in a batch, answers delivered back to whoever asked.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts"
+}

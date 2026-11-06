@@ -1,0 +1,8 @@
+{
+  "name": "memory-recall",
+  "version": "0.1.0",
+  "description": "When a tool call fails, matches the error against memory notes and skills and points the model at the matching note (once per note per session).",
+  "author": {
+    "name": "ychampion"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "name": "ystack",
+  "owner": {
+    "name": "ychampion"
+  },
+  "description": "ystack: Claude Code mods that turn agent house rules into enforced hooks (guards, delegation, long sessions, learning).",
+  "plugins": [
+    {
+      "name": "iron-rules",
+      "source": "./claude/mods/iron-rules"
+    },
+    {
+      "name": "verify",
+      "source": "./claude/mods/verify"
+    },
+    {
+      "name": "brief-linter",
+      "source": "./claude/mods/brief-linter"
+    },
+    {
+      "name": "assumptions-ledger",
+      "source": "./claude/mods/assumptions-ledger"
+    },
+    {
+      "name": "decision-inbox",
+      "source": "./claude/mods/decision-inbox"
+    },
+    {
+      "name": "spec-sharpener",
+      "source": "./claude/mods/spec-sharpener"
+    },
+    {
+      "name": "review-panel",
+      "source": "./claude/mods/review-panel"
+    },
+    {
+      "name": "context-meter",
+      "source": "./claude/mods/context-meter"
+    },
+    {
+      "name": "memory-recall",
+      "source": "./claude/mods/memory-recall"
+    },
+    {
+      "name": "auto-claudeception",
+      "source": "./claude/mods/auto-claudeception"
+    },
+    {
+      "name": "night-shift",
+      "source": "./claude/mods/night-shift"
+    },
+    {
+      "name": "session-recovery",
+      "source": "./claude/mods/session-recovery"
+    },
+    {
+      "name": "codex-ladder",
+      "source": "./claude/mods/codex-ladder"
+    }
+  ]
+}

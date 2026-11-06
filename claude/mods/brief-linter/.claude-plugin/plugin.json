@@ -1,0 +1,8 @@
+{
+  "name": "brief-linter",
+  "version": "0.1.0",
+  "description": "Appends the missing standing requirements (real check, long output to a file, Assumptions I made, loop cap, decision inbox) to every subagent brief.",
+  "author": {
+    "name": "ychampion"
+  }
+}

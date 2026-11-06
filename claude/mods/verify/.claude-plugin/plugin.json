@@ -1,0 +1,9 @@
+{
+  "name": "verify",
+  "version": "0.1.0",
+  "description": "Verify gate for the main loop and every subagent, plus a live runner of only the tests related to each edit; failing tests block a success claim.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts"
+}

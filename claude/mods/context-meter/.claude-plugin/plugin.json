@@ -1,0 +1,28 @@
+{
+  "name": "context-meter",
+  "version": "0.2.0",
+  "description": "Speaks up once when the context passes the handoff mark, when usage limits near 90%, at a push or merge with a big context, and before the prompt cache lapses. /ctx shows size, limits and cost; /handoff writes a phase handoff from a cache-read fork.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "handoffAt": {
+      "type": "number",
+      "title": "Handoff mark (tokens)",
+      "description": "Past this context size, suggest a handoff and /clear at the end of the phase.",
+      "default": 250000
+    },
+    "compactAt": {
+      "type": "number",
+      "title": "Auto-compact size (tokens)",
+      "description": "Your auto-compact window, shown in /ctx.",
+      "default": 400000
+    },
+    "handoffDir": {
+      "type": "string",
+      "title": "Handoff folder",
+      "description": "Where /handoff writes <project>-handoff.md. ~ is your home folder.",
+      "default": "~/.claude/plans"
+    }
+  }
+}

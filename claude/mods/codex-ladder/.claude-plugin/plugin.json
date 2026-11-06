@@ -1,0 +1,35 @@
+{
+  "name": "codex-ladder",
+  "version": "0.2.0",
+  "description": "Holds Codex CLI runs to an effort ladder: max only with your one-shot grant, low only via --profile docs, escalate a tier instead of retrying, and briefs need DONE, verification and a stop condition.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "defaultEffort": {
+      "type": "string",
+      "title": "Codex default effort",
+      "description": "The model_reasoning_effort in your ~/.codex/config.toml (what a run gets when it names none).",
+      "options": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "default": "xhigh"
+    },
+    "briefTemplate": {
+      "type": "string",
+      "title": "Brief template path",
+      "description": "Optional. A brief that lacks parts is pointed here.",
+      "default": ""
+    },
+    "blockFastTier": {
+      "type": "boolean",
+      "title": "Block the fast/priority service tier",
+      "description": "Denies runs that ask for the fast or priority service tier.",
+      "default": true
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "session-recovery",
+  "version": "0.1.0",
+  "description": "After a restart or crash, the first Claude session you open offers to reopen every session that was running, each as `claude --resume` in its own Windows Terminal tab (tmux on Linux). /recover, /recover auto on.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts"
+}

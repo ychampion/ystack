@@ -1,0 +1,8 @@
+{
+  "name": "auto-claudeception",
+  "version": "0.1.0",
+  "description": "After a long debugging turn or a 'turns out' discovery, toasts and pre-fills /claudeception (Tab to run). Never runs it by itself.",
+  "author": {
+    "name": "ychampion"
+  }
+}

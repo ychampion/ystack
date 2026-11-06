@@ -1,0 +1,8 @@
+{
+  "name": "spec-sharpener",
+  "version": "0.1.0",
+  "description": "On a large, open build request, has the main model ask 3-4 pointed questions before building (no side model, ~80 tokens). /sharpen on|off.",
+  "author": {
+    "name": "ychampion"
+  }
+}

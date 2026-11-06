@@ -1,0 +1,9 @@
+{
+  "name": "assumptions-ledger",
+  "version": "0.2.0",
+  "description": "Logs every subagent's 'Assumptions I made' and hands them to the main Claude to triage; only product or business calls reach the owner, via the decision inbox with context.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts"
+}

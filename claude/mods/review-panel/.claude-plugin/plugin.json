@@ -1,0 +1,8 @@
+{
+  "name": "review-panel",
+  "version": "0.1.0",
+  "description": "/review-panel: picks the specialist reviewers from the diff and has the orchestrator dispatch them on Opus in parallel, then verify findings. On demand only.",
+  "author": {
+    "name": "ychampion"
+  }
+}
