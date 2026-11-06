@@ -11,6 +11,7 @@ test('parses effort, profile and brief file', async () => {
   expect(effectiveEffort(parseCodex('codex exec "do x"'), 'high')).toBe('high')
   expect(parseCodex("codex exec -c model_reasoning_effort='ultra' x").effort).toBe('ultra')
   expect(parseCodex('codex exec -c model_reasoning_effort=medium -c model_reasoning_effort=max x').effort).toBe('max')
+  expect(parseCodex('codex exec -c model_reasoning_effort=max -c model_reasoning_effort=medium x').effort).toBe('max')
   expect(parseCodex('codex exec -c service_tier=priority x').hasServiceTier).toBe(true)
   expect(parseCodex('Get-Content -Raw C:/b/brief.md | codex exec -').briefFile).toBe('C:/b/brief.md')
 })

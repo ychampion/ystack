@@ -22,9 +22,10 @@ export function isCodexExec(command: string): boolean {
 }
 
 export function parseCodex(command: string): CodexCall {
-  // Every effort setting in the command, in order: the last one wins, as in codex's own config parsing.
-  const raw = [...command.matchAll(/model_reasoning_effort\s*=\s*["']?(\w+)|--effort[=\s]+["']?(\w+)/g)].at(-1)?.slice(1).find(Boolean)?.toLowerCase()
-  const effort = raw === undefined ? undefined : raw === 'ultra' ? 'ultra' : (LADDER as readonly string[]).includes(raw) ? (raw as Effort) : undefined
+  // Every effort setting in the command; the highest wins (fail closed), so text in a prompt can only make the check stricter.
+  const found = [...command.matchAll(/model_reasoning_effort\s*=\s*["']?(\w+)|--effort[=\s]+["']?(\w+)/g)].map(m => (m[1] ?? m[2] ?? '').toLowerCase())
+  const known = found.map(asEffort).filter((x): x is Effort => x !== undefined)
+  const effort = found.includes('ultra') ? 'ultra' : known.length ? LADDER[Math.max(...known.map(x => LADDER.indexOf(x)))] : undefined
   const profile = command.match(/--profile[=\s]+["']?([\w-]+)/)?.[1]
   const hasServiceTier = /service_tier|--fast\b|priority_tier/.test(command)
   const briefFile =

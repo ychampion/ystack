@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { CLAIM, DOC_FILE, failureLines, planRun, relatedTests, stemOf, suggestCheck } from '../hooks/detect.ts'
+import { CLAIM, DOC_FILE, failureLines, planRun, relatedTests, resolved, stemOf, suggestCheck } from '../hooks/detect.ts'
 
 const ROOT = 'C:/repo'
 const TRACKED = ['src/auth.ts', 'src/auth.test.ts', 'src/user.ts', 'tests/test_billing.py', 'billing.py', 'e2e/login.spec.ts']
@@ -35,4 +35,11 @@ test('claims, failure lines, hints', async () => {
   expect(CLAIM.test('I changed the parser.')).toBe(false)
   expect(failureLines('ok 1\n(fail) parses x\nerror: expected 2 got 3\nok 2')).toEqual(['(fail) parses x', 'error: expected 2 got 3'])
   expect(suggestCheck('package.json', '{"scripts":{"test":"bun test","typecheck":"tsc"}}')).toBe('bun run typecheck && bun run test')
+})
+
+test('paths are resolved before the session-folder check', async () => {
+  expect(resolved('C:\\Work\\app\\')).toBe('c:/work/app')
+  expect(resolved('C:/work/app/../other/./x')).toBe('c:/work/other/x')
+  expect(resolved('/home/me/app/../../../etc')).toBe('/etc')
+  expect(resolved('C:/work/app/sub/..').startsWith('c:/work/app')).toBe(true)
 })

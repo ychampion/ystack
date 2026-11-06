@@ -17,6 +17,17 @@ export const norm = (p: string) => p.replace(/\\/g, '/')
 export const dirOf = (p: string) => norm(p).replace(/\/[^/]*$/, '')
 export const baseOf = (p: string) => norm(p).replace(/^.*\//, '')
 
+/** Forward slashes, `.` and `..` collapsed, no trailing slash, lower case: comparable for a containment check. */
+export function resolved(path: string): string {
+  const out: string[] = []
+  for (const part of norm(path).split('/')) {
+    if (part === '..') {
+      if (out.length > 1) out.pop()
+    } else if (part !== '.' && !(part === '' && out.length > 0)) out.push(part)
+  }
+  return out.join('/').toLowerCase()
+}
+
 /** The name a related test file would carry: `auth.service.ts` -> `auth.service`, `test_auth.py` -> `auth`. */
 export function stemOf(path: string): string {
   return baseOf(path)

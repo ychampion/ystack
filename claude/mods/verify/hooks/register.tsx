@@ -13,6 +13,7 @@ import {
   failureLines,
   norm,
   planRun,
+  resolved,
   suggestCheck,
 } from './detect.ts'
 
@@ -133,8 +134,8 @@ async function onEdit($: EngineInterface, loop: string, file: string) {
   if (!isLiveOn || !CODE_FILE.test(file)) return
   const found = await findRoot($, file)
   if (!found) return
-  const sessionRoot = norm(await $.session.root()).replace(/\/+$/, '').toLowerCase()
-  const root = norm(found.root).toLowerCase()
+  const sessionRoot = resolved(await $.session.root())
+  const root = resolved(found.root)
   if (root !== sessionRoot && !root.startsWith(`${sessionRoot}/`)) return
   let st = roots.get(found.root)
   if (!st) roots.set(found.root, (st = { isRunning: false, isPending: false, files: new Set(), owners: new Set(), lastSig: '', wasFailing: false }))
