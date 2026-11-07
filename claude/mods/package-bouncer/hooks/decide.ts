@@ -1,6 +1,6 @@
 // The bouncer's rules: given what the registry said, deny, warn or let through. Pure.
 
-import type { Spec } from './parse.ts'
+import type { Ecosystem, Spec } from './parse.ts'
 import { isListedPopular, lookalikeOf } from './popular.ts'
 import { REGISTRY_LABEL, newestBefore, type Facts, type Vuln } from './registry.ts'
 import { compareVersions, pickVersion } from './versions.ts'
@@ -167,11 +167,25 @@ function highestFix(vulns: Vuln[]): string | undefined {
   return best
 }
 
+/** The ecosystem prefix the owner types in `/allow-package eco:NAME`. */
+export const ALLOW_PREFIX: Record<Ecosystem, string> = {
+  npm: 'npm',
+  pypi: 'pypi',
+  crates: 'crates',
+  go: 'go',
+  rubygems: 'gem',
+  packagist: 'composer',
+}
+
 /** The message Claude reads when the install is stopped: plain words it can pass on to the owner. */
 export function denyMessage(judgements: Judgement[]): string {
   const lines = judgements.flatMap(j => j.denies.map(d => `- ${d}`))
   // An unreadable name can't be allowed by name: only the ones the registry was asked about are offered.
-  const names = [...new Set(judgements.filter(j => j.level === 'deny' && j.spec.source !== 'unparsed').map(j => j.spec.name))]
+  const names = [
+    ...new Set(
+      judgements.filter(j => j.level === 'deny' && j.spec.source !== 'unparsed').map(j => `${ALLOW_PREFIX[j.spec.ecosystem]}:${j.spec.name}`),
+    ),
+  ]
   return [
     'package-bouncer stopped this install:',
     ...lines,

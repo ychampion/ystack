@@ -3,7 +3,30 @@ import { expect, test } from 'claude-code/testing'
 import { parseVault, safeArgs } from '../hooks/args.ts'
 import { decode, encode, fileSave, psLoadAll, psSave, secretToolStore } from '../hooks/keychain.ts'
 import { placeholderNames, rewriteCommand } from '../hooks/placeholders.ts'
+import { canonicalPath, isInside } from '../hooks/paths.ts'
 import { findSecret, formsOf, scrubDeep, scrubText, type Secret } from '../hooks/scrub.ts'
+
+test('paths fold to one spelling per platform', async () => {
+  const win = { os: 'windows', home: 'C:\\Users\\Me', powershell: '' } as const
+  const linux = { os: 'linux', home: '/home/me', powershell: '' } as const
+  const mac = { os: 'mac', home: '/Users/Me', powershell: '' } as const
+  expect(canonicalPath('~\\.claude\\.\\x\\..\\Vault.\\', win)).toBe('c:/users/me/.claude/vault')
+  expect(canonicalPath('\\\\?\\C:\\a\\\\b', win)).toBe('c:/a/b')
+  expect(canonicalPath('\\\\?\\UNC\\srv\\share\\x', win)).toBe('//srv/share/x')
+  expect(canonicalPath('sub\\..\\f', win, 'D:\\Work')).toBe('d:/work/f')
+  expect(canonicalPath('\\f', win, 'D:\\Work')).toBe('d:/f')
+  expect(canonicalPath('D:f', win, 'D:\\Work')).toBe('d:/work/f')
+  expect(canonicalPath('E:f', win, 'D:\\Work')).toBe('e:/f')
+  expect(canonicalPath('/../../etc', win, 'C:\\')).toBe('c:/etc')
+  expect(canonicalPath('~/.claude//./vault/', linux)).toBe('/home/me/.claude/vault')
+  expect(canonicalPath('../.Claude/vault', linux, '/home/me/w')).toBe('/home/me/.Claude/vault')
+  expect(canonicalPath('a\\b', linux, '/w')).toBe('/w/a\\b') // a backslash is a letter on Linux
+  expect(canonicalPath('~/.Claude/Vault', mac)).toBe('/users/me/.claude/vault')
+  expect(isInside('/h/.claude/vault', '/h/.claude/vault')).toBe(true)
+  expect(isInside('/h/.claude/vault/k', '/h/.claude/vault')).toBe(true)
+  expect(isInside('/h/.claude/vaults', '/h/.claude/vault')).toBe(false)
+  expect(isInside('/h/.claude', '/h/.claude/vault')).toBe(false)
+})
 
 const slot = (name: string) => (name === 'A' ? 'VAULT_SLOT_0' : 'VAULT_SLOT_1')
 const bash = (c: string) => rewriteCommand(c, 'bash', slot)

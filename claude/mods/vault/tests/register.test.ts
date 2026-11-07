@@ -213,6 +213,47 @@ test('commands that reach for the stored keys are refused', async ($, on) => {
   expect(w.shell).toEqual([])
 })
 
+test('the store folder is off limits however its path is spelled', async ($, on) => {
+  world(on)
+  on('session.cwd', () => ({ value: 'C:\\Users\\tester\\.claude' }))
+  await $.session.start({ cwd: 'C:\\Users\\tester\\.claude', surface: 'terminal', isInteractive: true })
+  const calls: Record<string, unknown>[] = [
+    { tool: 'Read', file_path: 'C:\\Users\\tester\\.claude\\.\\vault\\index.json' },
+    { tool: 'Read', file_path: 'C:/Users/tester/.claude/x/../vault/OPENAI_KEY.dpapi' },
+    { tool: 'Read', file_path: 'c:\\USERS\\Tester\\.CLAUDE\\Vault\\index.json' },
+    { tool: 'Read', file_path: 'C:\\Users\\tester\\.claude\\vault.\\index.json' },
+    { tool: 'Read', file_path: 'C:\\Users\\tester\\.claude\\vault\\ \\..\\index.json' },
+    { tool: 'Read', file_path: 'C:\\Users\\tester\\.claude\\vault\\...\\..\\index.json' },
+    { tool: 'Read', file_path: '\\\\?\\C:\\Users\\tester\\.claude\\vault\\index.json' },
+    { tool: 'Read', file_path: 'vault\\index.json' },
+    { tool: 'Read', file_path: '..\\.claude\\vault' },
+    { tool: 'Write', file_path: '~/.claude/./vault/index.json', content: '{}' },
+    { tool: 'Edit', file_path: '~\\.claude\\x\\..\\vault\\index.json', old_string: 'a', new_string: 'b' },
+    { tool: 'NotebookEdit', notebook_path: 'C:\\Users\\tester\\.claude\\.\\vault\\n.ipynb', new_source: 'x' },
+    { tool: 'Grep', pattern: 'sk-', path: 'C:\\Users\\tester\\.claude\\.\\vault' },
+    { tool: 'Glob', pattern: '*', path: '~/.claude/x/../vault/' },
+  ]
+  for (const call of calls) {
+    const r = await $.tool.call(call as unknown as Parameters<typeof $.tool.call>[0])
+    expect(`${JSON.stringify(call)} -> ${r.deny ?? 'allowed'}`).toContain('off limits')
+  }
+})
+
+test('the folders around the store stay usable: an ancestor search, a look-alike sibling', async ($, on) => {
+  world(on)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const calls: Record<string, unknown>[] = [
+    { tool: 'Grep', pattern: 'x', path: 'C:\\Users\\tester\\.claude' },
+    { tool: 'Glob', pattern: '*.md', path: '~/.claude' },
+    { tool: 'Read', file_path: 'C:\\Users\\tester\\.claude\\vaults\\notes.md' },
+    { tool: 'Read', file_path: 'C:\\Users\\tester\\.claude\\vault-notes.md' },
+  ]
+  for (const call of calls) {
+    const r = await $.tool.call(call as unknown as Parameters<typeof $.tool.call>[0])
+    expect(`${JSON.stringify(call)} -> ${r.deny ?? 'allowed'}`).toContain('allowed')
+  }
+})
+
 test('keys saved earlier are loaded at session start and scrubbed from the first result', async ($, on) => {
   const w = world(on, () => ({ stdout: `env dump: X=${KEY}`, stderr: '', interrupted: false }))
   w.dpapi.set('OLD_KEY', btoa(KEY))

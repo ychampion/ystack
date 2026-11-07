@@ -3,6 +3,7 @@ import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
 
 import { parseVault, safeArgs } from './args.ts'
 import { describeKey, loadAll, platform, readIndex, removeKey, saveKey, vaultDir, type Backend, type Platform } from './keychain.ts'
+import { canonicalPath, isInside } from './paths.ts'
 import { NAME, placeholder, placeholderNames, rewriteCommand, type Shell } from './placeholders.ts'
 import { findSecret, scrubDeep, scrubText, type Secret } from './scrub.ts'
 
@@ -145,7 +146,7 @@ async function clearAllSlots($: EngineInterface) {
 
 // ---- guards ----
 
-/** Shell text that reaches for the stored keys themselves. A deny-list on spellings: best effort. */
+/** Shell text that reaches for the stored keys themselves. A deny-list on spellings: a hint, best effort. */
 const STORE_TOUCH = /\.claude[\\/]+vault|\.dpapi\b|secret-tool\b[^\n;|&]*\b(lookup|search)\b|claude-vault|VAULT_SLOT_/i
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
@@ -162,8 +163,27 @@ function writtenText(input: Record<string, unknown>): string {
   return parts.join('\n')
 }
 
-function pathsOf(input: Record<string, unknown>): string {
-  return ['file_path', 'path', 'notebook_path', 'pattern', 'url'].map(k => (typeof input[k] === 'string' ? (input[k] as string) : '')).join('\n')
+/** The fields that name a file or folder (Read, Write, Edit, MultiEdit, NotebookEdit, Grep, Glob and the like). */
+const PATH_FIELDS = ['file_path', 'notebook_path', 'path']
+
+/**
+ * True when a tool's path is the store folder or inside it, however it is spelled. A second layer only:
+ * scrubbing every result is the main protection. A search rooted above the store is let through (its
+ * results are scrubbed); a glob or URL that spells the store out is refused as a hint.
+ */
+async function touchesStore($: EngineInterface, input: Record<string, unknown>): Promise<boolean> {
+  if (['pattern', 'url'].some(k => typeof input[k] === 'string' && /\.claude[\\/]+vault/i.test(input[k] as string))) return true
+  const paths = PATH_FIELDS.map(k => input[k]).filter((v): v is string => typeof v === 'string' && v !== '')
+  if (paths.length === 0) return false
+  try {
+    const p = await getPlatform($)
+    const cwd = await $.session.cwd().catch(() => '')
+    const store = canonicalPath(vaultDir(p), p)
+    return paths.some(raw => isInside(canonicalPath(raw, p, cwd), store))
+  } catch {
+    // Platform unknown: fall back to the spelling check rather than let the path through unchecked.
+    return paths.some(raw => /\.claude[\\/]+vault/i.test(raw))
+  }
 }
 
 /** Puts {{vault:NAME}} wherever a saved value shows up in what the tool answered. */
@@ -391,7 +411,7 @@ export const register: Register = on => {
       }
     }
 
-    if (/\.claude[\\/]+vault/i.test(pathsOf(input))) return { deny: 'vault: the stored keys are off limits.' }
+    if (await touchesStore($, input)) return { deny: 'vault: the stored keys are off limits.' }
     return scrubResult(await next(e), list)
   }).catch(($, e, next) => {
     // A broken guard must not leak a key: hold back an answer it could not check, refuse a call it could

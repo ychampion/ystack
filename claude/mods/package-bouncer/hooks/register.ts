@@ -1,7 +1,8 @@
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
-import { denyMessage, judge, noteText, type Config, type Judgement, type Lookup } from './decide.ts'
-import { isGoPrivate, normalizePypi, parseInstalls, parseRequirements, type Shell, type Spec } from './parse.ts'
+import { ALLOW_PREFIX, denyMessage, judge, noteText, type Config, type Judgement, type Lookup } from './decide.ts'
+import { isGoPrivate, parseInstalls, parseRequirements, type Ecosystem, type Shell, type Spec } from './parse.ts'
+import { canonical } from './popular.ts'
 import {
   OSV_URL,
   cratesFacts,
@@ -41,11 +42,93 @@ function configFrom(options: PluginOptions): Config {
 
 type Got = { kind: 'ok'; json: unknown } | { kind: 'missing' } | { kind: 'error'; why: string }
 
-// Per session: registry answers and the owner's allowed names. Reset at each session start.
+// Per session: registry answers, the owner's allows and the names the bouncer stopped. Reset at each session start.
 let cache = new Map<string, Promise<Got>>()
+/** `prefix:canonical name` allows one package in one ecosystem; `*:name` allows that exact spelling in all of them. */
 let allowed = new Set<string>()
+/** `prefix:canonical name` -> the number of the most recent stop that named it. */
+let denied = new Map<string, number>()
+let denySeq = 0
 
-const allowKey = (name: string) => normalizePypi(name)
+const ECOSYSTEMS = Object.keys(ALLOW_PREFIX) as Ecosystem[]
+const ECO_BY_PREFIX = new Map(ECOSYSTEMS.map(eco => [ALLOW_PREFIX[eco], eco]))
+const PREFIX_LIST = ECOSYSTEMS.map(eco => `${ALLOW_PREFIX[eco]}:`).join(', ')
+// The same package can be spelled several ways in its own ecosystem (PyPI folds case, '-', '_' and '.'),
+// so the key is the ecosystem's canonical name, never a fold borrowed from another ecosystem.
+const ecoKey = (eco: Ecosystem, name: string) => `${ALLOW_PREFIX[eco]}:${canonical(name, eco)}`
+const exactKey = (name: string) => `*:${name}`
+const isAllowed = (spec: Spec) => allowed.has(ecoKey(spec.ecosystem, spec.name)) || allowed.has(exactKey(spec.name))
+
+/** The ecosystems where the bouncer most recently stopped this name in this session (none if it never did). */
+function lastDeniedIn(name: string): Ecosystem[] {
+  let best = 0
+  let ecos: Ecosystem[] = []
+  for (const eco of ECOSYSTEMS) {
+    const seq = denied.get(ecoKey(eco, name)) ?? 0
+    if (seq > best) {
+      best = seq
+      ecos = [eco]
+    } else if (seq > 0 && seq === best) ecos.push(eco)
+  }
+  return ecos
+}
+
+function allowCommand(args: string): { text: string; context?: string[] } {
+  const words = args.split(/[\s,]+/).filter(Boolean)
+  if (words.length === 0) {
+    const list = [...allowed].map(k => (k.startsWith('*:') ? `${k.slice(2)} (exact spelling, any ecosystem)` : k))
+    return {
+      text:
+        list.length > 0
+          ? `Allowed this session: ${list.join(', ')}.`
+          : 'Nothing allowed yet. Type /allow-package eco:<name> (or just <name>) to allow a package the bouncer stopped.',
+    }
+  }
+  const done: string[] = []
+  const exact: string[] = []
+  const bad: string[] = []
+  for (const word of words) {
+    const m = /^([a-z]+):(.+)$/i.exec(word)
+    if (m) {
+      const eco = ECO_BY_PREFIX.get((m[1] as string).toLowerCase())
+      if (!eco) {
+        bad.push(word)
+        continue
+      }
+      allowed.add(ecoKey(eco, m[2] as string))
+      done.push(`${ALLOW_PREFIX[eco]}:${m[2]}`)
+      continue
+    }
+    const ecos = lastDeniedIn(word)
+    if (ecos.length > 0) {
+      for (const eco of ecos) {
+        allowed.add(ecoKey(eco, word))
+        done.push(`${ALLOW_PREFIX[eco]}:${word}`)
+      }
+    } else {
+      // Nothing to say which ecosystem was meant: allow only this exact spelling, with no folding at all.
+      allowed.add(exactKey(word))
+      exact.push(word)
+    }
+  }
+  const text: string[] = []
+  if (done.length > 0) text.push(`Allowed for this session: ${done.join(', ')}. Claude can install ${done.length === 1 ? 'it' : 'them'} now.`)
+  if (exact.length > 0) {
+    const one = exact.length === 1
+    text.push(
+      `${exact.join(', ')}: the bouncer hasn't stopped ${one ? 'that name' : 'those names'} this session, so ${one ? 'it is' : 'they are'} allowed in every ecosystem, ` +
+        `but only under that exact spelling (no folding of case, '-', '_' or '.'). To allow ${one ? 'it' : 'them'} in one ecosystem instead, type /allow-package eco:<name> (${PREFIX_LIST}).`,
+    )
+  }
+  if (bad.length > 0) {
+    text.push(`Not allowed: ${bad.join(', ')}. The part before ':' isn't an ecosystem the bouncer knows; use ${PREFIX_LIST}.`)
+  }
+  const labels = [...done, ...exact.map(w => `${w} (exact spelling, any ecosystem)`)]
+  return {
+    text: text.join(' '),
+    ...(labels.length > 0 ? { context: [`The owner allowed ${labels.join(', ')} past package-bouncer for this session. Run the install again.`] } : {}),
+  }
+}
 
 function fetchJson($: EngineInterface, url: string, init?: { method?: string; body?: string }): Promise<Got> {
   const key = `${init?.method ?? 'GET'} ${url} ${init?.body ?? ''}`
@@ -193,7 +276,7 @@ async function check($: EngineInterface, command: string, shell: Shell, cfg: Con
   const now = await $.clock.now()
   const judgements: Judgement[] = await Promise.all(
     specs.map(async spec => {
-      if (spec.source === 'registry' && allowed.has(allowKey(spec.name))) {
+      if (spec.source === 'registry' && isAllowed(spec)) {
         return { spec, level: 'ok' as const, denies: [], notes: [`${spec.name} was allowed by the owner for this session.`] }
       }
       const found = spec.source === 'registry' ? await lookup($, spec) : undefined
@@ -210,34 +293,27 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     cache = new Map()
     allowed = new Set()
+    denied = new Map()
+    denySeq = 0
     await $.command.register({
       name: 'allow-package',
       description: 'Let Claude install a package the bouncer stopped (this session only)',
-      argumentHint: '<name> [more names]',
+      argumentHint: '[npm:|pypi:|crates:|go:|gem:|composer:]<name> [more names]',
     })
     return next(e)
   })
 
-  on('command.run', { command: 'allow-package' }, async ($, e) => {
-    const names = e.args.split(/[\s,]+/).filter(Boolean)
-    if (names.length === 0) {
-      const list = [...allowed]
-      return {
-        text: list.length > 0 ? `Allowed this session: ${list.join(', ')}.` : 'Nothing allowed yet. Type /allow-package <name> to allow a package the bouncer stopped.',
-      }
-    }
-    for (const n of names) allowed.add(allowKey(n))
-    return {
-      text: `Allowed for this session: ${names.join(', ')}. Claude can install ${names.length === 1 ? 'it' : 'them'} now.`,
-      context: [`The owner allowed ${names.join(', ')} past package-bouncer for this session. Run the install again.`],
-    }
-  })
+  on('command.run', { command: 'allow-package' }, async ($, e) => allowCommand(e.args))
 
   on('tool.call', { tool: ['Bash', 'PowerShell'] }, async ($, e, next) => {
     const shell: Shell = e.tool === 'PowerShell' ? 'powershell' : 'bash'
     const judgements = await check($, e.command, shell, cfg)
     if (!judgements) return next(e)
-    if (judgements.some(j => j.level === 'deny')) return { deny: denyMessage(judgements) }
+    if (judgements.some(j => j.level === 'deny')) {
+      denySeq++
+      for (const j of judgements) if (j.level === 'deny' && j.spec.source === 'registry') denied.set(ecoKey(j.spec.ecosystem, j.spec.name), denySeq)
+      return { deny: denyMessage(judgements) }
+    }
     const ran = await next(e)
     const note = noteText(judgements)
     if (note === undefined || ran.deny !== undefined) return ran

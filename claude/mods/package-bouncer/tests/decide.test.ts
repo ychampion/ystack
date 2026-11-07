@@ -181,7 +181,11 @@ test('the deny message names the allow command and reads plainly', async () => {
   const a = judge(spec('reakt-dom-helperz'), { kind: 'missing' }, CFG, NOW)
   const msg = denyMessage([a])
   expect(msg.startsWith('package-bouncer stopped this install:')).toBe(true)
-  expect(msg).toContain('/allow-package reakt-dom-helperz')
+  expect(msg).toContain('/allow-package npm:reakt-dom-helperz')
+  const py = judge({ ecosystem: 'pypi', name: 'My_Pkg', raw: 'My_Pkg', source: 'registry' }, { kind: 'missing' }, CFG, NOW)
+  const gem = judge({ ecosystem: 'rubygems', name: 'gemx', raw: 'gemx', source: 'registry' }, { kind: 'missing' }, CFG, NOW)
+  const php = judge({ ecosystem: 'packagist', name: 'a/b', raw: 'a/b', source: 'registry' }, { kind: 'missing' }, CFG, NOW)
+  expect(denyMessage([py, gem, php])).toContain('/allow-package pypi:My_Pkg gem:gemx composer:a/b')
 })
 
 test('PyPI, crates.io, Go, RubyGems and Packagist answers read into facts', async () => {
