@@ -6,6 +6,8 @@ Mods are Claude Code plugins built from function hooks: they sit on tool calls, 
 /plugin install <mod> --marketplace ychampion/ystack
 ```
 
+In the desktop app's Code tab: + next to the prompt box → Plugins → Add marketplace `ychampion/ystack` → Add plugin.
+
 ## Guards
 
 | Mod | What it does | Settings |
