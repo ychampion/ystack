@@ -1,0 +1,22 @@
+{
+  "name": "operator-context",
+  "version": "0.1.0",
+  "description": "Gives Claude the facts you keep in a short profile file: who you are, what you own, what you authorize. Added once per session, framed as facts that never override safety rules; lines that try to switch safety off are dropped and shown. /operator shows it.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "profileFile": {
+      "type": "string",
+      "title": "Profile file",
+      "description": "The file with your facts and authorizations. ~ is your home folder. No file means nothing is added.",
+      "default": "~/.claude/operator.md"
+    },
+    "subagents": {
+      "type": "boolean",
+      "title": "Give the profile to subagents",
+      "description": "Also put the profile at the top of each subagent's task, since their system prompt comes from their agent definition.",
+      "default": true
+    }
+  }
+}

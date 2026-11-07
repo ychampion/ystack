@@ -1,0 +1,17 @@
+{
+  "name": "twins",
+  "version": "0.1.0",
+  "description": "Tells you when two copies of something drift apart, and never edits anything itself. List pairs of folders in twins.json; when a session edits one side, a band says the other copy is behind. /twins shows the changed files and a line count; only /twins sync <name> asks Claude to port the change, and /twins done or ignore clears it.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "twinsFile": {
+      "type": "string",
+      "title": "Project twins file",
+      "description": "Path, inside the project, of the file that lists twin pairs. ~/.claude/twins.json is always read too.",
+      "default": ".claude/twins.json"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "owner-view",
+  "version": "0.1.0",
+  "description": "Follow what agents do without reading code: a plain-English caption under every tool row, /brief-me (done, left, risky, needs you) written from a cache-read fork and shown on its own when you come back from a break, a stage strip (Plan, Build, Review, Test, Ship) with what the change still needs, and the missing step offered as the prompt suggestion.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "captions": {
+      "type": "boolean",
+      "title": "Plain captions on tool rows",
+      "description": "Shows a short plain-English line under each tool row. Commands no rule knows get one small, capped model call each.",
+      "default": true
+    },
+    "awayMinutes": {
+      "type": "number",
+      "title": "Away after (minutes)",
+      "description": "After this many idle minutes, your next prompt opens a 'While you were away' brief.",
+      "default": 45
+    },
+    "suggestions": {
+      "type": "boolean",
+      "title": "Suggest the missing step",
+      "description": "After a turn, offers the step the change still needs (tests, a browser check, a security review) as the prompt box's Tab suggestion.",
+      "default": true
+    }
+  }
+}

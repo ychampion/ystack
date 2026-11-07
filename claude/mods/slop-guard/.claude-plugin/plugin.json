@@ -1,0 +1,28 @@
+{
+  "name": "slop-guard",
+  "version": "0.1.0",
+  "description": "Checks every UI edit for AI-design tells (glows, gradient text, generic fonts, fake proof, hype copy and 12 more) and tells Claude the line and the reason. Four unmistakable tells hold the turn at Stop until fixed or explained. /slop-guard lists the session's findings.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Check UI edits",
+      "description": "Scans the new text of every Edit or Write to css, scss, tsx, jsx, html, vue, svelte and astro files. Turn off to silence slop-guard entirely.",
+      "default": true
+    },
+    "ruleLevels": {
+      "type": "string",
+      "title": "Rule overrides",
+      "description": "Rule ids to switch off, comma-separated (e.g. hype-copy, lazy-cta), or id=off|warn|block to change a level (e.g. banned-font=warn). /slop-guard lists the ids.",
+      "default": ""
+    },
+    "extraBannedFonts": {
+      "type": "string",
+      "title": "Extra banned fonts",
+      "description": "Font names treated like the built-in banned faces, comma-separated (e.g. Montserrat, Open Sans). A project's own brand font goes in its .slop-guard.json \"brandFonts\" instead.",
+      "default": ""
+    }
+  }
+}

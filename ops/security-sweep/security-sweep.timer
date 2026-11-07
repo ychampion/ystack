@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the security sweep every Sunday at 03:30
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00
+RandomizedDelaySec=30min
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

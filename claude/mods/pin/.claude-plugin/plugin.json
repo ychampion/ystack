@@ -1,0 +1,9 @@
+{
+  "name": "pin",
+  "version": "0.1.0",
+  "description": "Rules the owner gives mid-session survive compaction word for word. /pin <rule> pins one for this session, /pin --project <rule> for every session in this folder, /pin lists them, /unpin <n> removes one. Suggests pins when a prompt states a hard rule; never pins on its own.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts"
+}

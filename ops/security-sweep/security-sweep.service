@@ -1,0 +1,31 @@
+[Unit]
+Description=Weekly security sweep (restart-free security patches, report everything else)
+Documentation=file:///opt/security-sweep/README.md
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/opt/security-sweep/security-sweep.env
+Environment=HOME=/root
+ExecStart=/opt/security-sweep/sweep.sh
+TimeoutStartSec=4h
+# Be gentle with a busy machine.
+Nice=10
+CPUWeight=20
+IOSchedulingClass=idle
+# Hardening that still lets apt/dpkg install packages (they write /usr, /etc, /var, /boot).
+PrivateTmp=yes
+ProtectHome=read-only
+ReadWritePaths=/opt/security-sweep -/root/.claude/decision-inbox
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=security-sweep

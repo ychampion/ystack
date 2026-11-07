@@ -3,7 +3,7 @@
   "owner": {
     "name": "ychampion"
   },
-  "description": "ystack: Claude Code mods that turn agent house rules into enforced hooks (guards, delegation, long sessions, learning).",
+  "description": "ystack: Claude Code mods that turn agent house rules into enforced hooks (guards, delegation, long sessions, learning, cost, owner view, design).",
   "plugins": [
     {
       "name": "iron-rules",
@@ -56,6 +56,58 @@
     {
       "name": "codex-ladder",
       "source": "./claude/mods/codex-ladder"
+    },
+    {
+      "name": "package-bouncer",
+      "source": "./claude/mods/package-bouncer"
+    },
+    {
+      "name": "vault",
+      "source": "./claude/mods/vault"
+    },
+    {
+      "name": "slop-guard",
+      "source": "./claude/mods/slop-guard"
+    },
+    {
+      "name": "loop-breaker",
+      "source": "./claude/mods/loop-breaker"
+    },
+    {
+      "name": "lanes",
+      "source": "./claude/mods/lanes"
+    },
+    {
+      "name": "keep-going",
+      "source": "./claude/mods/keep-going"
+    },
+    {
+      "name": "operator-context",
+      "source": "./claude/mods/operator-context"
+    },
+    {
+      "name": "prompt-diet",
+      "source": "./claude/mods/prompt-diet"
+    },
+    {
+      "name": "output-diet",
+      "source": "./claude/mods/output-diet"
+    },
+    {
+      "name": "pin",
+      "source": "./claude/mods/pin"
+    },
+    {
+      "name": "owner-view",
+      "source": "./claude/mods/owner-view"
+    },
+    {
+      "name": "user-voice",
+      "source": "./claude/mods/user-voice"
+    },
+    {
+      "name": "twins",
+      "source": "./claude/mods/twins"
     }
   ]
 }

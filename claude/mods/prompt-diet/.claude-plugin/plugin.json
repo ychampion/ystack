@@ -1,0 +1,29 @@
+{
+  "name": "prompt-diet",
+  "version": "0.1.0",
+  "description": "Shows what every turn sends to Claude, largest first (system prompt, CLAUDE.md, reminders, tool descriptions, skill listing), and tracks which tools and skills you actually use. Lets you load rarely used tools on demand and leave out noisy reminders for a session. Nothing becomes unreachable: deferred tools stay findable and every skill stays callable. /diet restore undoes it.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoDefer": {
+      "type": "boolean",
+      "title": "Load unused plugin and MCP tools on demand",
+      "description": "At the start of each session, plugin and MCP tools you have not used in the last N sessions load on demand through tool search instead of being sent every turn. Core tools always stay. Off by default.",
+      "default": false
+    },
+    "unusedSessions": {
+      "type": "number",
+      "title": "Unused for this many sessions",
+      "description": "How many recent sessions a tool must go unused before auto-defer loads it on demand. Nothing is deferred until this many sessions have been recorded.",
+      "default": 20
+    },
+    "compactSkills": {
+      "type": "boolean",
+      "title": "Shorten the skill listing",
+      "description": "Keeps full descriptions only for skills used in recent sessions; the rest are listed by name, and a find_skill tool returns their descriptions on request. Every skill stays callable. Off by default.",
+      "default": false
+    }
+  }
+}

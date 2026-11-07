@@ -1,0 +1,9 @@
+{
+  "name": "vault",
+  "version": "0.1.0",
+  "description": "Lets Claude use API keys without seeing them: /vault add NAME saves a key in the system's secure storage, Claude writes {{vault:NAME}} in commands, and the value is hidden again in everything Claude reads.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts"
+}

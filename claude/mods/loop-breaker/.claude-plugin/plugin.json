@@ -1,0 +1,23 @@
+{
+  "name": "loop-breaker",
+  "version": "0.1.0",
+  "description": "Notices when the main session or a subagent goes in circles (the same failing command, the same error, undoing and redoing an edit, a test flipping) and breaks the loop: a note, then a second opinion from the same model, then a stop with a decision for the owner.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "repeats": {
+      "type": "number",
+      "title": "Repeats before it steps in",
+      "description": "How many times the same failing command or the same error may repeat before loop-breaker steps in.",
+      "default": 3
+    },
+    "secondOpinion": {
+      "type": "boolean",
+      "title": "Ask for a second opinion",
+      "description": "On the second trigger, ask the same model the stuck agent runs on for a fresh look (one extra model call). Off: the second trigger stops the agent.",
+      "default": true
+    }
+  }
+}

@@ -6,8 +6,9 @@ It is general on purpose. Nothing in here is tied to one person's machine: anyth
 
 | Folder | For | Status |
 | --- | --- | --- |
-| [`claude/`](claude/) | Claude Code | 13 mods |
-| `skills/` | Claude Code, Codex, OpenCode and other agents that read skills | planned |
+| [`claude/`](claude/) | Claude Code | 26 mods |
+| [`skills/`](skills/) | Claude Code, Codex, OpenCode and other agents that read skills | `taste` (design judgment), `make-media` (images and video when code isn't enough) |
+| [`ops/`](ops/) | Any Linux server | `security-sweep`: a weekly scan of OS packages, repos and containers that installs only restart-free security patches and reports the rest |
 
 ## Install a Claude Code mod
 

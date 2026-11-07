@@ -1,0 +1,17 @@
+{
+  "name": "lanes",
+  "version": "0.1.0",
+  "description": "Keeps several Claude sessions in one repo from tripping over each other: tells a session when another holds the file it just edited, warns both sides early when two worktrees change the same file, and holds back git commands that hit state every worktree shares (stash, reset --hard, clean, gc, removing a worktree in use). /lanes lists who is where.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "block": {
+      "type": "boolean",
+      "title": "Block edits to a file another session holds",
+      "description": "Off: a session that edits a file another session in the same folder is working on gets a note. On: the edit is refused instead.",
+      "default": false
+    }
+  }
+}

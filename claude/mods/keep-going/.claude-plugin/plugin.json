@@ -1,0 +1,22 @@
+{
+  "name": "keep-going",
+  "version": "0.1.0",
+  "description": "When Claude stops to offer an in-scope, reversible next step it could just take (\"Want me to continue?\"), sends it back to finish the work. Never for decisions, risky or outward actions, or finished work. /keep-going lists nudges, /keep-going off|on.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Send Claude back to work",
+      "description": "When Claude ends a turn by offering to do in-scope, reversible work it could just do, block the stop and tell it to finish.",
+      "default": true
+    },
+    "maxNudges": {
+      "type": "number",
+      "title": "Most nudges per request",
+      "description": "How many times keep-going may send Claude back to work for one request of yours.",
+      "default": 2
+    }
+  }
+}

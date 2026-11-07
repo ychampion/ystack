@@ -1,0 +1,28 @@
+{
+  "name": "package-bouncer",
+  "version": "0.1.0",
+  "description": "Checks every package install Claude runs (npm, bun, pnpm, yarn, pip, uv, cargo, go, gem, composer) and stops made-up names, brand-new packages, look-alike names and versions with known security holes.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "minAgeDays": {
+      "type": "number",
+      "title": "Minimum age in days",
+      "description": "Block a package, or the version being installed, if it was published fewer than this many days ago. 0 turns the age rule off.",
+      "default": 14
+    },
+    "minWeeklyDownloads": {
+      "type": "number",
+      "title": "Weekly downloads before a warning",
+      "description": "Add a warning (not a block) when a package had fewer downloads than this last week.",
+      "default": 500
+    },
+    "failClosed": {
+      "type": "boolean",
+      "title": "Block when the registry can't be reached",
+      "description": "Off: an install the bouncer can't check goes ahead with a warning. On: it is blocked.",
+      "default": false
+    }
+  }
+}

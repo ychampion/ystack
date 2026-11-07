@@ -1,0 +1,23 @@
+{
+  "name": "output-diet",
+  "version": "0.1.0",
+  "description": "Shortens long build, install and test output before it enters the context: strips progress bars, collapses repeated lines, drops passing tests when something failed, and keeps every error with its context. File contents, diffs and searches pass through untouched, and the full output is always saved to a file Claude can read. /output-diet shows what it saved.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Shorten long command output",
+      "description": "Shortens long build, install and test output from Bash and PowerShell. The full output is always saved to a file. /output-diet off turns it off for one session.",
+      "default": true
+    },
+    "maxLines": {
+      "type": "number",
+      "title": "Shorten output longer than (lines)",
+      "description": "Output longer than this many lines (or 12,000 characters) is shortened. Minimum 80.",
+      "default": 150
+    }
+  }
+}
