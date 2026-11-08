@@ -65,6 +65,8 @@ export function planRun(args: {
   edited: readonly string[]
   tracked: readonly string[]
   root: string
+  /** The project's interpreter (its .venv python, or `uv run python`); bare `python` when unset. */
+  python?: readonly string[]
 }): Plan {
   const { manifest, edited, tracked, root } = args
   const rootN = norm(root).replace(/\/$/, '')
@@ -84,7 +86,7 @@ export function planRun(args: {
   if (manifest === 'pyproject.toml' || manifest === 'pytest.ini' || manifest === 'setup.cfg') {
     const tests = relatedTests(edited, tracked, root).filter(t => t.endsWith('.py'))
     if (tests.length === 0) return undefined
-    return { argv: ['python', '-m', 'pytest', '-q', '-x', '--no-header', '-p', 'no:cacheprovider', ...tests], label: `pytest (${tests.length})` }
+    return { argv: [...(args.python ?? ['python']), '-m', 'pytest', '-q', '-x', '--no-header', '-p', 'no:cacheprovider', ...tests], label: `pytest (${tests.length})` }
   }
   if (manifest === 'Cargo.toml') return { argv: ['cargo', 'check', '--quiet', '--message-format=short'], label: 'cargo check' }
   if (manifest === 'go.mod') {

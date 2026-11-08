@@ -69,6 +69,15 @@ async function trackedFiles($: EngineInterface, root: string): Promise<string[]>
   return files
 }
 
+/** The Python the project itself uses: its .venv interpreter, else `uv run python` when it has a uv.lock. */
+async function projectPython($: EngineInterface, root: string): Promise<string[] | undefined> {
+  for (const p of [`${root}/.venv/Scripts/python.exe`, `${root}/.venv/bin/python`]) {
+    if (await $.fs.exists(p)) return [p]
+  }
+  if (await $.fs.exists(`${root}/uv.lock`)) return ['uv', 'run', 'python']
+  return undefined
+}
+
 async function runLive($: EngineInterface, root: string, manifest: Manifest) {
   const st = roots.get(root)
   if (!st) return
@@ -90,6 +99,7 @@ async function runLive($: EngineInterface, root: string, manifest: Manifest) {
     edited,
     tracked: await trackedFiles($, root),
     root,
+    python: manifest === 'package.json' ? undefined : await projectPython($, root),
   })
   if (!plan) return
 
