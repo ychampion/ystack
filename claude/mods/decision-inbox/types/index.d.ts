@@ -11,6 +11,10 @@ export type Decision = {
   at: number
   status: 'open' | 'answered'
   answer?: string
+  /** When the owner answered; the asking session delivers entries that have it and no deliveredAt. */
+  answeredAt?: number
+  /** When the asking session handed the answer to itself or its subagent. */
+  deliveredAt?: number
 }
 
 declare module 'claude-code' {

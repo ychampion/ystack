@@ -60,6 +60,12 @@ through the script.
    example a vault that substitutes `{{vault:GEMINI_API_KEY}}`), else a `GEMINI_API_KEY` user
    environment variable. **Never ask for a key in chat.**
 
+**Unverified on a paid key.** The script's request path, cap, ledger and error handling have been tested
+only against the free tier's refusal (`429 ... limit: 0`); no paid call has produced a file yet. Treat the
+first real call as the check: look at the file, and compare the ledger with the billing page. Use only
+`GEMINI_API_KEY`, never another Google key that happens to be set, and don't spend on a test the user
+didn't ask for.
+
 **Commands** (run from the project root; `<make-media>` is where this skill is installed, and the
 `GEMINI_API_KEY="{{vault:...}}"` prefix applies only with a vault mod):
 

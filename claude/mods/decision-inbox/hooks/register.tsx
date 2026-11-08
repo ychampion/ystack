@@ -31,18 +31,35 @@ async function reload($: EngineInterface) {
   }
   out.sort((a, b) => a.at - b.at)
   await update($, list, () => out.slice(-300))
+  await pickup($, out)
 }
 
-async function deliver($: EngineInterface, d: Decision, answer: string) {
-  const text = `Owner's decision on ${d.id} ("${d.question}"): ${answer}. Adjust if you took a different default.`
+// An answer is never sent between sessions. The pane it was given in only marks the file answered; the session
+// that asked finds it here on its own refresh and hands it to itself (or to its subagent). So only that session
+// sees it, the permission modes of the two sessions don't matter, and an answer given while the asking session
+// was closed arrives when it is resumed (same session id). Entries without answeredAt were answered by an older
+// version, which delivered them itself.
+const delivering = new Set<string>()
+const ENDED = ['completed', 'failed', 'killed']
+async function pickup($: EngineInterface, all: Decision[]) {
   const here = await $.session.id()
-  if (d.sessionId === here && d.agentId === undefined) {
-    await $.prompt.submit({ text })
-    return
+  for (const d of all) {
+    if (d.sessionId !== here || d.status !== 'answered' || d.answeredAt === undefined || d.deliveredAt !== undefined) continue
+    if (delivering.has(d.id) || d.answer === undefined || !d.options.includes(d.answer)) continue
+    delivering.add(d.id)
+    await writeDecision($, { ...d, deliveredAt: await $.clock.now() })
+    const text = `Owner's decision on ${d.id} ("${d.question}"): ${d.answer}. Adjust if you took a different default.`
+    if (d.agentId !== undefined) {
+      const agent = (await $.agent.list().catch(() => [])).find(a => a.id === d.agentId)
+      if (agent !== undefined && !ENDED.includes(agent.status)) {
+        const sent = await $.session.send({ to: { agentId: d.agentId }, text }).catch(() => undefined)
+        if (sent?.isDelivered) continue
+      }
+      void $.prompt.submit({ text: `${text} (the agent that asked has finished: apply it yourself.)` })
+      continue
+    }
+    void $.prompt.submit({ text }) // runs once the session is idle
   }
-  const to = d.agentId !== undefined && d.sessionId === here ? { agentId: d.agentId } : { sessionId: d.sessionId }
-  const sent = await $.session.send({ to, text }).catch(() => undefined)
-  if (sent === undefined && d.sessionId === here) await $.prompt.submit({ text: `${text} (the agent that asked has finished: apply it yourself.)` })
 }
 
 export const register: Register = on => {
@@ -151,9 +168,9 @@ export const register: Register = on => {
                   label={o === d.recommended ? `${o} (taken by default)` : o}
                   variant={o === d.recommended ? 'primary' : undefined}
                   onPress={async () => {
-                    await writeDecision($, { ...d, status: 'answered', answer: o })
-                    await reload($)
-                    await deliver($, d, o)
+                    await writeDecision($, { ...d, status: 'answered', answer: o, answeredAt: await $.clock.now() })
+                    await reload($) // delivers at once when this session asked
+                    if (d.sessionId !== (await $.session.id())) $.ui.toast(`${d.id} answered: ${d.from} picks it up within 30 s, or when that session next runs`)
                   }}
                 />
               ))}
