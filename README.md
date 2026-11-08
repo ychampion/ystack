@@ -25,3 +25,5 @@ From a shell: `claude plugin install <mod> --marketplace ychampion/ystack`.
 In the Claude desktop app's Code tab, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `ychampion/ystack`, then Add plugin. A mod installed from a terminal at user scope also loads in the desktop app's local Code sessions. Mods run inside Claude Code only: not in claude.ai chat, and not in cloud sessions unless installed there.
 
 The mods and what each does are listed in [`claude/README.md`](claude/README.md).
+
+**Measured, not guessed:** [what long Claude Code sessions cost](claude/docs/long-sessions.md). Most usage came from a few sessions running for days near the compaction limit, and from their subagents. The page covers handoff versus compaction, and [`claude/tools/usage-report.py`](claude/tools/usage-report.py) gets the same numbers from your own logs.

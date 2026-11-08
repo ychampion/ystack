@@ -35,7 +35,7 @@ In the desktop app's Code tab: + next to the prompt box → Plugins → Add mark
 
 | Mod | What it does | Settings |
 | --- | --- | --- |
-| `context-meter` | Speaks once when the context passes your handoff mark, when a usage limit nears 90%, and before the prompt cache lapses on a big idle context. `/ctx` shows size, limits and cost; `/handoff` writes a handoff doc from a cache-read fork, so the main context does not grow. | `handoffAt`, `compactAt`, `handoffDir` |
+| `context-meter` | `/handoff` writes a handoff in one turn and swaps the conversation in place for it: no `/clear`, and background agents keep reporting. It also hands off by itself between turns: after a push or merge on a big context, before the prompt cache lapses on an idle one, and when a session is running on its own on agent reports. Speaks once at the handoff mark and near usage limits; `/ctx` shows size, limits and cost. Why, with measured numbers: [docs/long-sessions.md](docs/long-sessions.md). | `handoffAt`, `compactAt`, `handoffDir`, `autoHandoff` |
 | `night-shift` | `/queue add <task>`, then `/queue start [HH:MM]`: runs queued tasks one at a time unattended, with soft budgets, a pause at rate limits, compaction between tasks and a morning report. | uses `decision-inbox` |
 | `session-recovery` | After a restart or crash, offers to reopen every Claude session that was running, each resumed in its own Windows Terminal tab (tmux on Linux). `/recover`. | — |
 | `loop-breaker` | Notices when the main session or a subagent goes in circles (the same failure repeating, an edit undone and redone, a flapping test). First a note, then a second opinion from the same model with no history, then it stops the agent and leaves you a decision in the inbox. | `repeats` (3), `secondOpinion` |

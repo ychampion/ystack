@@ -1,7 +1,7 @@
 {
   "name": "context-meter",
-  "version": "0.2.0",
-  "description": "Speaks up once when the context passes the handoff mark, when usage limits near 90%, at a push or merge with a big context, and before the prompt cache lapses. /ctx shows size, limits and cost; /handoff writes a phase handoff from a cache-read fork.",
+  "version": "0.3.0",
+  "description": "Keeps long sessions cheap. /handoff writes a handoff in one turn and swaps the conversation in place for it (no /clear; background agents keep reporting). Hands off by itself between turns: after a push or merge on a big context, before the prompt cache lapses on an idle one, and when a session is running on its own. Speaks once at the handoff mark and near usage limits; /ctx shows size, limits and cost.",
   "author": {
     "name": "ychampion"
   },
@@ -9,7 +9,7 @@
     "handoffAt": {
       "type": "number",
       "title": "Handoff mark (tokens)",
-      "description": "Past this context size, suggest a handoff and /clear at the end of the phase.",
+      "description": "Past this context size, hand off at the next boundary (a push or merge, a long idle, or a run going on its own).",
       "default": 250000
     },
     "compactAt": {
@@ -23,6 +23,12 @@
       "title": "Handoff folder",
       "description": "Where /handoff writes <project>-handoff.md. ~ is your home folder.",
       "default": "~/.claude/plans"
+    },
+    "autoHandoff": {
+      "type": "boolean",
+      "title": "Automatic handoffs",
+      "description": "Hand off by itself between turns: after a push or merge past the handoff mark, after 50 minutes idle on 200k+, and when a turn started by an agent report, another session or a schedule ends past the mark while you haven't typed for 15 minutes. Off: only /handoff.",
+      "default": true
     }
   }
 }
