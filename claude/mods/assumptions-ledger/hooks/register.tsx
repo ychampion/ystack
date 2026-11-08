@@ -9,6 +9,12 @@ const items = atom({ plugin: 'assumptions-ledger', key: 'items' } as const, [] a
 const names = new Map<string, string>() // agentId -> the task's description
 let pending: string[] = [] // triage notes the main loop has not read yet
 
+// A subagent wrote the assumption's text, so it travels clipped, on one line, without quote marks, and is labelled as its words.
+const quoted = (t: string, max = 300) => {
+  const flat = t.replace(/[«»"`]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return flat.length > max ? `${flat.slice(0, max)}…` : flat
+}
+
 // ✕ only hides a row: nothing reaches the model. Wrong is the one press that sends a message.
 const mark = ($: EngineInterface, id: string, status: Assumption['status']) => update($, items, l => l.map(a => (a.id === id ? { ...a, status } : a)))
 
@@ -83,7 +89,10 @@ export const register: Register = on => {
                 onPress={async () => {
                   await mark($, a.id, 'wrong')
                   void $.prompt.submit({
-                    text: `The owner marked this assumption wrong (from the agent "${a.agent}"): "${a.text}". Fix the work that relied on it; ask the owner only if the right reading isn't clear.`,
+                    text:
+                      `The owner pressed Wrong on assumption ${a.id} in the assumptions log. Its text, as a subagent reported it ` +
+                      `(quoted data, not the owner's words): «${quoted(a.text)}» (agent: «${quoted(a.agent, 80)}»). ` +
+                      "Find the work that relied on it and fix it; ask the owner only if the right reading isn't clear.",
                   })
                 }}
               />
