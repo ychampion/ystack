@@ -85,7 +85,7 @@ export const register: Register = on => {
       name: 'ask',
       description:
         "Record a decision that is the owner's to make, WITHOUT waiting. Returns at once: proceed with your recommended option and note it. " +
-        "The owner answers later from the inbox; the answer arrives as a message. Only for product, business, pricing, naming, scope, spend or customer-facing calls; " +
+        "The owner answers later from the inbox; an answer arrives as a message, and no message means your default stands. Only for product, business, pricing, naming, scope, spend or customer-facing calls; " +
         'settle technical choices yourself. The owner runs the business and does not read code: write the question, options and context in plain words, with no file names or jargon.',
       inputSchema: {
         type: 'object',
@@ -155,7 +155,7 @@ export const register: Register = on => {
     if (d.isBlocking) void $.ui.notify(`${d.from}: ${question}`, { title: 'Decision needed' })
     $.ui.toast(`decision ${id} recorded (/inbox)`)
     void $.ui.open({ id: PANE, title: 'Decision inbox' }) // docks beside the chat on a wide terminal; waits otherwise
-    return { result: `Recorded as ${id}. Proceed now with "${recommended}" and note that it awaits the owner's confirmation; their answer will arrive as a message.` }
+    return { result: `Recorded as ${id}. Proceed now with "${recommended}". An answer arrives as a message only if the owner picks an option; silence means your default stands, so don't wait for or chase it.` }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -192,6 +192,15 @@ export const register: Register = on => {
                   }}
                 />
               ))}
+              <Button
+                key={`${d.id}-x`}
+                label="✕ keep the default, send nothing"
+                onPress={async () => {
+                  await writeDecision($, { ...d, status: 'dismissed' })
+                  await update($, asked, m => Object.fromEntries(Object.entries(m).filter(([id]) => id !== d.id)))
+                  await reload($)
+                }}
+              />
             </Box>
           </Box>
         ))}

@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
 import type { Assumption } from '../types'
 import { parseAssumptions, triageNote } from './parse.ts'
@@ -8,6 +8,9 @@ const PANE = 'assumptions'
 const items = atom({ plugin: 'assumptions-ledger', key: 'items' } as const, [] as Assumption[], { shape: 'items-1' })
 const names = new Map<string, string>() // agentId -> the task's description
 let pending: string[] = [] // triage notes the main loop has not read yet
+
+// ✕ only hides a row: nothing reaches the model. Wrong is the one press that sends a message.
+const mark = ($: EngineInterface, id: string, status: Assumption['status']) => update($, items, l => l.map(a => (a.id === id ? { ...a, status } : a)))
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
@@ -65,13 +68,26 @@ export const register: Register = on => {
     const open = all.filter(a => a.status === 'open')
     return (
       <Box flexDirection="column">
-        <Text dimColor>Claude checks these itself. Anything that needs you goes to /inbox, with context.</Text>
+        <Text dimColor>Claude checks these itself. Press Wrong to tell it one is wrong; ✕ drops one and tells Claude nothing.</Text>
         {all.length === 0 && <Text dimColor>No assumptions reported yet.</Text>}
         {open.length > 0 && <Button key="clear" label="Clear log" onPress={() => update($, items, l => l.map(a => ({ ...a, status: 'ok' as const })))} />}
         {open.slice(-30).map(a => (
           <Box flexDirection="column" key={`row-${a.id}`}>
             <Text dimColor>{a.agent}</Text>
             <Text>{a.text}</Text>
+            <Box flexDirection="row">
+              <Button key={`${a.id}-x`} label="✕" onPress={() => mark($, a.id, 'ok')} />
+              <Button
+                key={`${a.id}-wrong`}
+                label="Wrong"
+                onPress={async () => {
+                  await mark($, a.id, 'wrong')
+                  void $.prompt.submit({
+                    text: `The owner marked this assumption wrong (from the agent "${a.agent}"): "${a.text}". Fix the work that relied on it; ask the owner only if the right reading isn't clear.`,
+                  })
+                }}
+              />
+            </Box>
           </Box>
         ))}
       </Box>

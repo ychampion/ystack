@@ -9,7 +9,8 @@ export type Decision = {
   agentId?: string
   from: string
   at: number
-  status: 'open' | 'answered'
+  /** dismissed: the owner kept the default with ✕; nothing is ever sent for it. */
+  status: 'open' | 'answered' | 'dismissed'
   answer?: string
   /** When the owner answered; the asking session delivers entries that have it and no deliveredAt. */
   answeredAt?: number

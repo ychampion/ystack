@@ -144,3 +144,16 @@ test('an answer that is not one of the options is ignored', async ($, on) => {
   expect(h.submitted).toEqual([])
   expect(saved(h, 'D-a').deliveredAt).toBeUndefined()
 })
+
+test('✕ keeps the default: the file is marked dismissed and no session ever gets a message', async ($, on) => {
+  const h = fakeHost(on, 'asker', [])
+  await start($)
+  await $.tool.call({ tool: 'mcp__decision-inbox__ask', question: 'Which price?', options: ['$8', '$12'], recommended: '$8', context: 'The page goes live tomorrow and the price is on it.' } as never)
+  const ui = await $.ui.mount(PANE)
+  await $.ui.press({ plugin: 'decision-inbox', key: 'D-rs-x', requestId: 'decision-inbox' })
+  await ui.unmount()
+  expect(saved(h, 'D-rs').status).toBe('dismissed')
+  await start($) // a later refresh
+  expect(h.submitted).toEqual([])
+  expect(h.sent).toEqual([])
+})
