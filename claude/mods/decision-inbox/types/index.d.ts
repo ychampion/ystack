@@ -17,8 +17,11 @@ export type Decision = {
   deliveredAt?: number
 }
 
+/** What this session asked, kept in its own state: the answer's message is built from it, not from the shared file. */
+export type Asked = { question: string; options: string[]; agentId?: string }
+
 declare module 'claude-code' {
   interface PluginState {
-    'decision-inbox': { list: Shaped<Decision[]> }
+    'decision-inbox': { list: Shaped<Decision[]>; asked: Shaped<Record<string, Asked>> }
   }
 }

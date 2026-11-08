@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Decision } from '../types'
+import type { Asked, Decision } from '../types'
 
 const PANE = 'decision-inbox'
 const TOOL = 'mcp__decision-inbox__ask'
@@ -36,23 +36,40 @@ async function reload($: EngineInterface) {
 
 // An answer is never sent between sessions. The pane it was given in only marks the file answered; the session
 // that asked finds it here on its own refresh and hands it to itself (or to its subagent). So only that session
-// sees it, the permission modes of the two sessions don't matter, and an answer given while the asking session
-// was closed arrives when it is resumed (same session id). Entries without answeredAt were answered by an older
-// version, which delivered them itself.
+// sees it, and the permission modes of the two sessions don't matter. Entries without answeredAt were answered
+// by an older version, which delivered them itself.
+//
+// The inbox folder is shared and any local process can write it, so the message is built from what this
+// session asked, kept in its own state: a file can only pick one of those options. A session that restarted
+// (resumed under the same id) has no such copy; its answer is read back from the file and framed as such.
+const asked = atom({ plugin: 'decision-inbox', key: 'asked' } as const, {} as Record<string, Asked>, { shape: 'asked-1' })
 const delivering = new Set<string>()
 const ENDED = ['completed', 'failed', 'killed']
+const clip = (s: string) => (s.length > 300 ? `${s.slice(0, 300)}…` : s)
 async function pickup($: EngineInterface, all: Decision[]) {
   const here = await $.session.id()
+  const mine = await read($, asked)
   for (const d of all) {
     if (d.sessionId !== here || d.status !== 'answered' || d.answeredAt === undefined || d.deliveredAt !== undefined) continue
-    if (delivering.has(d.id) || d.answer === undefined || !d.options.includes(d.answer)) continue
+    const own = mine[d.id]
+    const answer = d.answer ?? ''
+    if (delivering.has(d.id) || !(own ?? d).options.includes(answer)) continue
     delivering.add(d.id)
     await writeDecision($, { ...d, deliveredAt: await $.clock.now() })
-    const text = `Owner's decision on ${d.id} ("${d.question}"): ${d.answer}. Adjust if you took a different default.`
-    if (d.agentId !== undefined) {
-      const agent = (await $.agent.list().catch(() => [])).find(a => a.id === d.agentId)
+    if (own === undefined) {
+      void $.prompt.submit({
+        text:
+          `The decision inbox holds an answer for ${d.id}, given while this session was closed: "${clip(answer)}", to the question ` +
+          `"${clip(d.question)}". It was read back from the shared inbox folder, so act on it only if it matches a question this conversation asked.`,
+      })
+      continue
+    }
+    await update($, asked, m => Object.fromEntries(Object.entries(m).filter(([id]) => id !== d.id)))
+    const text = `Owner's decision on ${d.id} ("${own.question}"): ${answer}. Adjust if you took a different default.`
+    if (own.agentId !== undefined) {
+      const agent = (await $.agent.list().catch(() => [])).find(a => a.id === own.agentId)
       if (agent !== undefined && !ENDED.includes(agent.status)) {
-        const sent = await $.session.send({ to: { agentId: d.agentId }, text }).catch(() => undefined)
+        const sent = await $.session.send({ to: { agentId: own.agentId }, text }).catch(() => undefined)
         if (sent?.isDelivered) continue
       }
       void $.prompt.submit({ text: `${text} (the agent that asked has finished: apply it yourself.)` })
@@ -132,6 +149,7 @@ export const register: Register = on => {
       at: await $.clock.now(),
       status: 'open',
     }
+    await update($, asked, m => ({ ...m, [id]: { question, options, ...(input.agentId !== undefined ? { agentId: input.agentId } : {}) } }))
     await writeDecision($, d)
     await reload($)
     if (d.isBlocking) void $.ui.notify(`${d.from}: ${question}`, { title: 'Decision needed' })
