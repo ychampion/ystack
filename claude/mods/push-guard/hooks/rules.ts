@@ -554,7 +554,7 @@ export function actions(command: string, shell: Shell, depth = 0): Action[] {
       out.push(...curlActions(v))
     } else if (v.prog === 'invoke-restmethod' || v.prog === 'invoke-webrequest' || v.prog === 'irm' || v.prog === 'iwr') {
       out.push(...psRestActions(v))
-    } else if (!NO_EXEC.has(v.prog)) {
+    } else if (LAUNCHERS.has(v.prog)) {
       // xargs, find -exec, watch, parallel and the like may add words push-guard can't see (stdin, file names):
       // what they run must be a literal git or gh command that can't push, commit or change a repo.
       const at = v.args.findIndex(a => { const p = progName(a); return p === 'git' || p === 'gh' })
@@ -577,8 +577,8 @@ function launchedIsSafe(tool: string, after: string[]): boolean {
   return group !== undefined && !isDynamic(group) && !isExpanded(group) && GH_CORE.has(group) && !LAUNCHED_GH_RISKY.has(group)
 }
 
-/** Programs that print or search their words rather than run them. */
-const NO_EXEC = new Set(['echo', 'printf', 'write-host', 'write-output', 'grep', 'egrep', 'fgrep', 'rg', 'ag', 'man', 'which', 'where', 'whereis', 'type', 'get-command', 'gcm', 'tldr', 'git', 'gh'])
+/** Programs that run their words as a command, possibly with words added from stdin or file names. */
+const LAUNCHERS = new Set(['xargs', 'find', 'parallel', 'watch', 'flock', 'setsid', 'script', 'unbuffer', 'chronic', 'ionice', 'taskset', 'strace', 'ltrace', 'entr', 'sem', 'systemd-run', 'su', 'runuser', 'firejail', 'proxychains', 'proxychains4', 'torsocks', 'function', 'foreach-object', '%', 'start-process', 'start-job', 'invoke-command', 'icm'])
 const LAUNCHED_GIT_RISKY = new Set(['push', 'commit', 'config', 'rebase', 'submodule', 'bisect', 'for-each-repo', 'filter-branch', 'difftool', 'mergetool'])
 const LAUNCHED_GH_RISKY = new Set(['repo', 'api', 'alias', 'extension'])
 /** gh's own top-level commands; any other name is an alias or an extension. */

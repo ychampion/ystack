@@ -393,6 +393,17 @@ test('S7 a git alias with shell syntax in its value is refused, not re-parsed', 
   expect(seen).toEqual([])
 })
 
+test('S8 text that only mentions a risky git command (a heredoc, a commit message) is not refused', async ($, on) => {
+  host(on, args => (has(args, 'diff') || has(args, 'log') ? { out: '' } : branches('feature', 'feature')(args)))
+  const seen = shell(on)
+  const cmds = [
+    'cat > notes.md <<EOF\nnever run git push --force origin main\nEOF',
+    'git commit -m "$(cat <<EOF\nDocument why git push --force origin main is refused\nEOF\n)"',
+  ]
+  for (const c of cmds) await $.tool.call({ tool: 'Bash', command: c })
+  expect(seen).toEqual(cmds)
+})
+
 test('S5 PowerShell: an env change before an unknown git name is refused', async ($, on) => {
   host(on, args => (has(args, 'config', '--get') ? { code: 1 } : undefined))
   const seen = shell(on)
