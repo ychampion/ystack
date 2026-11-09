@@ -329,14 +329,19 @@ export type GitCall = {
   replay: string[]
   sub: string
   rest: string[]
+  /** `-c alias.x=...` or `--config-env alias.x=...`: the subcommand may be an alias defined right there. */
+  inlineAlias?: true
 }
 
 /** Separates git's global options from its subcommand. */
 export function gitCall(args: string[]): GitCall | undefined {
   const replay: string[] = []
+  let inlineAlias = false
   let i = 0
   while (i < args.length) {
     const a = args[i] as string
+    if ((a === '-c' || a === '--config-env') && /^alias\./i.test(args[i + 1] ?? '')) inlineAlias = true
+    if (/^(-c|--config-env=)alias\./i.test(a)) inlineAlias = true
     if (a === '-C' || a === '--git-dir' || a === '--work-tree') {
       if (args[i + 1] === undefined) return undefined
       replay.push(a, args[i + 1] as string)
@@ -356,7 +361,7 @@ export function gitCall(args: string[]): GitCall | undefined {
       i++
       continue
     }
-    return { replay, sub: a, rest: args.slice(i + 1) }
+    return { replay, sub: a, rest: args.slice(i + 1), ...(inlineAlias ? { inlineAlias: true as const } : {}) }
   }
   return undefined
 }

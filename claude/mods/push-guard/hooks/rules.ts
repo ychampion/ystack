@@ -1,6 +1,6 @@
 // Turns the programs a command runs into the risky actions push-guard checks. Pure: no `$`.
 
-import { gitCall, invocations, isAbsolute, type Invocation, type Shell } from './parse.ts'
+import { gitCall, invocations, isAbsolute, progName, type Invocation, type Shell } from './parse.ts'
 
 /**
  * Where our own git calls run: the segment's `cd` and the call's `-C` / `--git-dir` / `--work-tree`.
@@ -12,6 +12,10 @@ export type Base = { cwd?: string; replay: string[]; cwdUnknown?: boolean }
 export const isDynamic = (s: string) => /[$`]/.test(s)
 /** gh's `{owner}` / `{repo}` / `{branch}` placeholders, filled from the repo the command runs in. */
 export const hasPlaceholder = (s: string) => /\{(owner|repo|branch)\}/i.test(s)
+/** Shell brace or glob expansion (`{main,}`, `ma?n`, `[m]ain`): the word git gets can't be read from the text. */
+export const isExpanded = (s: string) => /[{}?[\]]/.test(s)
+/** A brace expansion proper (`{a,b}`, `{1..3}`), which can turn one word into several. */
+const BRACE = /\{[^{}]*(,|\.\.)[^{}]*\}/
 
 /** `all`: everything; a list: those paths only; `none`: nothing. */
 export type Scope = 'all' | 'none' | string[]
@@ -52,7 +56,12 @@ export type DeleteRepoAction = { kind: 'delete-repo'; base: Base; repo?: string;
 /** `target`: `owner/name/branch`; the owner and name may be gh placeholders. */
 export type DeleteRefAction = { kind: 'delete-ref'; base: Base; target: string; how: string }
 
-export type Action = CommitAction | PushAction | PublicAction | DeleteRepoAction | DeleteRefAction
+/** A git or gh call push-guard can't read: a variable subcommand, brace expansion, an inline alias, a launcher. */
+export type UnknownAction = { kind: 'unknown'; base: Base; how: string }
+/** A git subcommand that isn't a builtin: maybe an alias from git config, which register looks up. */
+export type AliasAction = { kind: 'git-alias'; base: Base; sub: string; rest: string[] }
+
+export type Action = CommitAction | PushAction | PublicAction | DeleteRepoAction | DeleteRefAction | UnknownAction | AliasAction
 
 const REPO_OPTS = new Set(['-C', '--git-dir', '--work-tree'])
 
@@ -257,14 +266,14 @@ function pushAction(v: Invocation, replay: string[], rest: string[]): PushAction
     const target = stripHeads(rawDst ? normRef(rawDst) : src)
     if (force || plus) {
       if (target === 'HEAD') forced.push({ current: true })
-      else if (isDynamic(target)) forced.push({ unknown: target })
+      else if (isDynamic(target) || isExpanded(target)) forced.push({ unknown: target })
       else if (target.includes('*')) forced.push({ all: true })
       else forced.push({ branch: target })
     }
     // A source starting with '-' would reach git as an option: never pass it on.
     // One that can't be read is scanned as every local branch.
     if (src && !src.startsWith('-')) {
-      if (isDynamic(src)) {
+      if (isDynamic(src) || isExpanded(src)) {
         if (!revFlags.includes('--branches')) revFlags.push('--branches')
       } else revs.push(src)
     }
@@ -458,6 +467,17 @@ export function actions(command: string, shell: Shell): Action[] {
     if (v.prog === 'git') {
       const g = gitCall(v.args)
       if (!g) continue
+      const subAt = v.args.length - g.rest.length - 1
+      const risky = g.sub === 'push' || g.sub === 'commit'
+      if (isDynamic(g.sub) || isExpanded(g.sub) || v.args.slice(0, subAt).some(a => BRACE.test(a)) || (risky && g.rest.some(a => BRACE.test(a)))) {
+        out.push({ kind: 'unknown', base: baseOf(v, g.replay), how: `\`git ${v.args.slice(0, subAt + 1).join(' ')}\` uses a variable or shell expansion where push-guard needs to read the words.` })
+        continue
+      }
+      if (!BUILTINS.has(g.sub.toLowerCase())) {
+        if (g.inlineAlias) out.push({ kind: 'unknown', base: baseOf(v, g.replay), how: `\`git ${g.sub}\` may be an alias defined inline with \`-c alias.\`.` })
+        else out.push({ kind: 'git-alias', base: baseOf(v, g.replay), sub: g.sub, rest: g.rest })
+        continue
+      }
       if (g.sub === 'add' || g.sub === 'stage') {
         const s = addScope(g.rest)
         pendingTracked = mergeScope(pendingTracked, s.tracked)
@@ -473,10 +493,36 @@ export function actions(command: string, shell: Shell): Action[] {
       out.push(...curlActions(v))
     } else if (v.prog === 'invoke-restmethod' || v.prog === 'invoke-webrequest' || v.prog === 'irm' || v.prog === 'iwr') {
       out.push(...psRestActions(v))
+    } else if (!NO_EXEC.has(v.prog)) {
+      // xargs, find -exec, watch, parallel and the like run git with words push-guard can't see (stdin, file names).
+      const at = v.args.findIndex(a => { const p = progName(a); return p === 'git' || p === 'gh' })
+      if (at >= 0 && v.args.slice(at + 1).some(a => LAUNCHED_RISKY.has(a.toLowerCase()))) {
+        out.push({ kind: 'unknown', base: baseOf(v), how: `\`${v.prog}\` runs \`${progName(v.args[at] as string)} ${v.args.slice(at + 1, at + 3).join(' ')}\` for you, so push-guard can't see the words it gets.` })
+      }
     }
   }
   return out
 }
+
+/** Programs that print or search their words rather than run them. */
+const NO_EXEC = new Set(['echo', 'printf', 'write-host', 'write-output', 'grep', 'egrep', 'fgrep', 'rg', 'ag', 'man', 'which', 'where', 'whereis', 'type', 'get-command', 'gcm', 'tldr', 'git', 'gh'])
+const LAUNCHED_RISKY = new Set(['push', 'commit', 'repo', 'api'])
+
+/**
+ * git's builtin subcommands. git never lets an alias shadow one, so only other names need an alias lookup.
+ * A name missing here costs one `git config` call, nothing more.
+ */
+const BUILTINS = new Set(
+  ('add am annotate apply archive bisect blame branch bundle cat-file check-attr check-ignore check-mailmap check-ref-format checkout ' +
+    'checkout-index cherry cherry-pick citool clean clone column commit commit-graph commit-tree config count-objects credential describe ' +
+    'diagnose diff diff-files diff-index diff-tree difftool fast-export fast-import fetch fetch-pack filter-branch for-each-ref ' +
+    'for-each-repo format-patch fsck gc get-tar-commit-id grep gui hash-object help hook index-pack init instaweb interpret-trailers ' +
+    'log ls-files ls-remote ls-tree mailinfo mailsplit maintenance merge merge-base merge-file merge-index merge-tree mergetool mktag ' +
+    'mktree multi-pack-index mv name-rev notes pack-objects pack-refs patch-id prune prune-packed pull push range-diff read-tree rebase ' +
+    'reflog remote repack replace replay rerere reset restore rev-list rev-parse revert rm send-email send-pack shortlog show show-branch ' +
+    'show-index show-ref sparse-checkout stage stash status stripspace submodule switch symbolic-ref tag unpack-file unpack-objects ' +
+    'update-index update-ref update-server-info var verify-commit verify-pack verify-tag version whatchanged worktree write-tree lfs').split(' '),
+)
 
 /** A glob (`*`, `**`, `?`) as a regex; a pattern with no `/` matches the base name too. */
 export function globMatch(pattern: string, path: string): boolean {

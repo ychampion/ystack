@@ -1,7 +1,7 @@
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { Shell } from './parse.ts'
-import { actions, globMatch, hasPlaceholder, isDynamic, repoName, type Action, type Base, type CommitAction, type PushAction, type Scope } from './rules.ts'
+import { actions, globMatch, hasPlaceholder, isDynamic, isExpanded, repoName, type Action, type Base, type CommitAction, type PushAction, type Scope } from './rules.ts'
 import { COMMIT_MARK, describe, scanDiff, scanFile, type Finding } from './secrets.ts'
 
 type Config = { allowPaths: string[]; protectedRepos: string[]; protectedBranches: string[] }
@@ -229,9 +229,36 @@ const SECRET_HELP =
 
 const UNKNOWN_REPO = "push-guard couldn't tell which repo this runs in; run it from that folder or with git -C <path>."
 
-async function check($: EngineInterface, w: Where, a: Action, cfg: Config, notes: string[]): Promise<string[]> {
+const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
+
+async function check($: EngineInterface, w: Where, a: Action, cfg: Config, notes: string[], depth = 0): Promise<string[]> {
   const why: string[] = []
   switch (a.kind) {
+    case 'unknown':
+      why.push(`${a.how} Run git or gh directly, with the words written out, so push-guard can check it.`)
+      break
+    case 'git-alias': {
+      if (a.base.cwdUnknown) {
+        why.push(`\`git ${a.sub}\` may be an alias, and ${UNKNOWN_REPO}`)
+        break
+      }
+      const r = await git($, w, a.base, ['config', '--get', `alias.${a.sub}`])
+      // Exit 1 with no output: no such alias, so git runs an external `git-<sub>` or fails.
+      if (!r.ok && r.out.trim() === '' && r.err === '') break
+      if (!r.ok) {
+        why.push(`push-guard couldn't look up whether \`git ${a.sub}\` is an alias (${r.err || 'git config failed'}). Run the command it stands for directly.`)
+        break
+      }
+      const expansion = r.out.trim()
+      if (expansion.startsWith('!') || depth >= 3) {
+        why.push(`\`git ${a.sub}\` is a git alias for \`${expansion.slice(0, 80)}\`. Run the command it stands for directly, so push-guard can check it.`)
+        break
+      }
+      for (const inner of actions(`git ${expansion} ${a.rest.map(quote).join(' ')}`, 'bash')) {
+        why.push(...(await check($, w, { ...inner, base: a.base } as Action, cfg, notes, depth + 1)))
+      }
+      break
+    }
     case 'commit': {
       if (a.base.cwdUnknown) {
         why.push(UNKNOWN_REPO)
@@ -275,7 +302,7 @@ async function check($: EngineInterface, w: Where, a: Action, cfg: Config, notes
         )
       }
       for (const d of a.deletes) {
-        if (isDynamic(d)) {
+        if (isDynamic(d) || isExpanded(d.replace(/:(prune|mirror)$/, ""))) {
           why.push(`This deletes a remote branch push-guard can't read (${d}). Name the branch literally so the user can decide.`)
           continue
         }

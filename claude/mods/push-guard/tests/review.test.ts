@@ -254,3 +254,45 @@ test('false positives: the documented AWS example key, example and test env file
   const tricky = `diff --git a/notes.md b/notes.md\n--- a/notes.md\n+++ b/notes.md\n@@ -1,0 +1,2 @@\n+++ tests/fixtures/x\n+key ${AWS}\n`
   expect(scanDiff(tricky, ['tests/**'])).toEqual([{ file: 'notes.md', line: 2, kind: 'AWS access key ID' }])
 })
+
+// Repros from the post-commit security review: words the shell rewrites, aliases and launchers.
+
+test('S1 brace or glob expansion, a variable subcommand, an inline alias and launchers are refused', async ($, on) => {
+  host(on, branches('feature', 'feature'))
+  const seen = shell(on)
+  for (const cmd of [
+    'git push -f origin {main,}',
+    'git push {-f,} origin main',
+    'git {push,} -f origin main',
+    'git $CMD -f origin main',
+    'git push -f origin ma?n',
+    'git push -f origin +[m]ain',
+    'git push origin :{main,}',
+    'git -c alias.p=push p -f origin main',
+    'echo main | xargs git push -f origin',
+    'find . -maxdepth 0 -exec git push -f origin main \;',
+    'watch -n 60 git push -f origin main',
+    'parallel gh repo edit {} --visibility public ::: acme/x',
+  ]) expect([cmd, refusal(await $.tool.call({ tool: 'Bash', command: cmd })) ?? 'ran']).toEqual([cmd, expect.stringMatching(/push-guard/)])
+  expect(seen).toEqual([])
+})
+
+test('S2 a git config alias is checked as what it stands for; shell aliases are refused; builtins need no lookup', async ($, on) => {
+  const calls = host(on, args => {
+    if (has(args, 'config', '--get', 'alias.fp')) return { out: 'push -f origin main\n' }
+    if (has(args, 'config', '--get', 'alias.sh')) return { out: '!git push -f origin main\n' }
+    if (has(args, 'config', '--get', 'alias.lg')) return { out: 'log --oneline\n' }
+    if (has(args, 'config', '--get')) return { code: 1 }
+    return branches('feature', 'feature')(args)
+  })
+  const seen = shell(on)
+  expect(refusal(await $.tool.call({ tool: 'Bash', command: 'git fp' }))).toContain('protected branch: main')
+  expect(refusal(await $.tool.call({ tool: 'Bash', command: 'git sh' }))).toContain('is a git alias for')
+  await $.tool.call({ tool: 'Bash', command: 'git lg -5' })
+  await $.tool.call({ tool: 'Bash', command: 'git frobnicate' })
+  const before = calls.length
+  await $.tool.call({ tool: 'Bash', command: 'git log --oneline {a,b}' })
+  await $.tool.call({ tool: 'Bash', command: 'echo git push -f origin main' })
+  expect(calls.length).toBe(before)
+  expect(seen).toEqual(['git lg -5', 'git frobnicate', 'git log --oneline {a,b}', 'echo git push -f origin main'])
+})

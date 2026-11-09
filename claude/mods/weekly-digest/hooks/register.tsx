@@ -91,8 +91,17 @@ async function transcripts($: EngineInterface, since: number): Promise<FileRef[]
   return out
 }
 
+/**
+ * A repo's own .git/config can name programs git runs (core.fsmonitor on `status`, hooks, a pager), so every
+ * call turns those off, and --no-optional-locks keeps `status` from writing the index.
+ */
+function safeGit(cwd: string): string[] {
+  const none = isWindowsPath(cwd) ? 'NUL' : '/dev/null'
+  return ['--no-optional-locks', '-c', 'core.fsmonitor=', '-c', `core.hooksPath=${none}`, '-c', 'core.pager=cat', '-c', 'diff.external=', '-c', 'log.showSignature=false']
+}
+
 async function git($: EngineInterface, cwd: string, args: string[]): Promise<string | undefined> {
-  const r = await $.process.run(['git', ...args], { cwd }).catch(() => undefined)
+  const r = await $.process.run(['git', ...safeGit(cwd), ...args], { cwd }).catch(() => undefined)
   return r && r.exitCode === 0 ? r.stdout : undefined
 }
 

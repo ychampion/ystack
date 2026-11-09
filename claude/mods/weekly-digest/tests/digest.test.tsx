@@ -27,6 +27,8 @@ type Host = {
   files: Map<string, F>
   writes: Map<string, string>
   runs: { argv: string[]; cwd: string }[]
+  /** git calls made without the safe prefix. */
+  unsafeGit: number
   spawns: string[][]
   models: string[]
   toasts: string[]
@@ -96,7 +98,7 @@ function fakeHost(on: OnT, opts: Opts = {}): Host {
   mock.store(on)
   const clock = mock.clock(on, { now: NOW })
   const files = new Map(Object.entries(opts.files ?? baseFiles()))
-  const host: Host = { clock, files, writes: new Map(), runs: [], spawns: [], models: [], toasts: [] }
+  const host: Host = { clock, files, writes: new Map(), runs: [], unsafeGit: 0, spawns: [], models: [], toasts: [] }
   on('env.get', (_, e) => ({ value: e.name === 'HOME' ? '/home/t' : e.name === 'CLAUDE_CONFIG_DIR' ? opts.configDir : undefined }) as never)
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('command.register', () => ({ value: undefined }) as never)
@@ -129,6 +131,13 @@ function fakeHost(on: OnT, opts: Opts = {}): Host {
   on('process.run', (_, e) => {
     const argv = [...e.argv]
     const cwd = key(e.init?.cwd ?? '/')
+    if (argv[0] === 'git') {
+      // Every git call must carry the safe prefix; the rest of the mock reads the words after it.
+      host.unsafeGit += argv[1] === '--no-optional-locks' && argv.includes('core.fsmonitor=') ? 0 : 1
+      let i = 1
+      while (argv[i] === '--no-optional-locks' || argv[i] === '-c') i += argv[i] === '-c' ? 2 : 1
+      argv.splice(1, i - 1)
+    }
     host.runs.push({ argv, cwd })
     if (argv[0] === 'git') return { value: git(argv.slice(1), cwd, opts) } as never
     if (argv[0] === 'gh') {
@@ -187,6 +196,8 @@ test('groups what shipped, what is in flight, what needs you, and time and usage
   const h = fakeHost(on)
   await digest($, h)
   const md = h.writes.get(PATH) ?? ''
+  expect(h.unsafeGit).toBe(0)
+  expect(h.runs.filter(r => r.argv[0] === "git").length).toBeGreaterThan(0)
   expect(md).toContain('# Digest: 2 Nov 2026 to 9 Nov 2026 (7 days)')
   expect(md).toContain('## shop\n\nFolder: /work/shop\n\n**Shipped**\n\n- 1 merged PR, 2 pushed commits.\n- Add checkout (#12)\n- Tax rounding\n')
   expect(md).toContain('**In flight**\n\n- Open PR #14: New pricing page (draft)\n- Branch feature/cart: 3 commits not pushed\n- 2 files changed, not committed\n')
