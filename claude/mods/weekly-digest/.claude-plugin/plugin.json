@@ -1,6 +1,6 @@
 {
   "name": "weekly-digest",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "/digest [days] writes a plain-English digest of what shipped across the repos your sessions touched: merged PRs and pushed commits, work in flight, decisions waiting on you, and time and usage per repo. Saved as markdown and shown in a pane; never sent anywhere unless you turn on polish.",
   "author": {
     "name": "ychampion"
