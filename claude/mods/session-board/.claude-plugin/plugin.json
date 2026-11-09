@@ -1,0 +1,23 @@
+{
+  "name": "session-board",
+  "version": "0.1.0",
+  "description": "/sessions opens a board of every Claude Code session on this machine from the last day: folder, running or not, context size with a handoff mark, usage today, idle time, subagents and its last line. Costliest first, with a resume command to copy and a button to ask a running session to hand off.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "hours": {
+      "type": "number",
+      "title": "Look-back (hours)",
+      "description": "List sessions active within this many hours.",
+      "default": 24
+    },
+    "handoffAt": {
+      "type": "number",
+      "title": "Handoff mark (tokens)",
+      "description": "A session whose context is at or above this size is marked \"handoff due\".",
+      "default": 250000
+    }
+  }
+}

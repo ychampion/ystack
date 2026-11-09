@@ -8,6 +8,15 @@ Mods are Claude Code plugins built from function hooks: they sit on tool calls, 
 
 In the desktop app's Code tab: + next to the prompt box → Plugins → Add marketplace `ychampion/ystack` → Add plugin.
 
+## Start here
+
+| Mod | What it does | Settings |
+| --- | --- | --- |
+| `ystack-stats` | Shows what ystack saves, from your own logs, on day one. `/ystack-stats` re-prices your last two weeks of real API calls under ystack's handoff and compaction rules (on one heavy user's logs: 15% less), and once you've used ystack a few days it compares real usage per active hour before and after you installed it. Logs are read locally and cached; `/ystack-stats share` gives a paste-ready summary with numbers only. | `days` (14) |
+| `ystack-setup` | A checklist of the Claude Code settings that measured well: compaction windows, two subagent types that compact at 250k, agent teams off, a default subagent model. Each item says what changes, why, the measured gain, and whether you already have it. Nothing changes until you tick and press Apply; every file is backed up and Undo puts it back. `/ystack-setup check` prints the same for scripts. Why each one: [docs/settings.md](docs/settings.md). | `haikuModel` |
+
+Measured write-ups behind the mods are in [docs/](docs/).
+
 ## Guards
 
 | Mod | What it does | Settings |
@@ -18,6 +27,7 @@ In the desktop app's Code tab: + next to the prompt box → Plugins → Add mark
 | `package-bouncer` | Checks every package install (npm, bun, pnpm, yarn, pip, uv, pipx, cargo, go, gem, composer) against the registry and OSV before it runs. Stops made-up names, known-vulnerable versions, releases younger than the minimum age, look-alikes of popular packages and names it can't read; warns on low downloads and npm install scripts. `/allow-package eco:NAME` (e.g. `npm:left-pad`, `pypi:my_pkg`) lets one through for the session; a bare `NAME` applies to the ecosystem where it was last stopped. | `minAgeDays` (14), `minWeeklyDownloads` (500), `failClosed` |
 | `vault` | Lets Claude use API keys without seeing them. `/vault add NAME` saves a key to the OS keychain (Windows DPAPI, Linux secret-tool, else a 0600 file); Claude writes `{{vault:NAME}}`, the key reaches only that command through an environment variable, and it is hidden again in everything Claude reads and in the transcript. Writing a key into a file is refused. Refusing file tools on the store folder (checked on the resolved path, however it is spelled) is a second layer; hiding the keys in everything Claude reads is the main protection. | — |
 | `slop-guard` | Checks design edits (CSS, TSX, HTML, Vue, Svelte, Astro, Tailwind classes) for the tells of AI-made design and reports them to Claude with line numbers; blocks only the unmistakable ones (gradient text, glows, banned fonts, fake content) until fixed or explained. Pairs with the `taste` skill. | per-rule overrides, extra banned fonts |
+| `push-guard` | Stops Claude and its subagents before the git mistakes you can't take back: committing or pushing an API key (it names the file and kind, never the value), making a private repo public, force-pushing over `main`, deleting a remote branch or repo. When it can't tell which repo or branch a command hits (a `cd "$VAR"`, a request body it can't read), it refuses rather than guess. Each stop says why and what to do instead; only you can let one through, with `/push-guard allow`. | `protectedBranches`, `protectedRepos`, `allowPaths` |
 
 `codex-ladder` reads effort from the command line; an effort it cannot read counts as `max`. It is a guardrail against mistakes, not a security boundary: a Codex profile or `~/.codex/config.toml` can set effort without the command showing it. The same goes for `package-bouncer`: it catches honest mistakes, not deliberate evasion (`eval`, scripts).
 
@@ -30,6 +40,7 @@ In the desktop app's Code tab: + next to the prompt box → Plugins → Add mark
 | `decision-inbox` | A non-blocking `ask` tool: an agent records a decision that is yours, takes its recommended default and keeps working. `/inbox` lists them with plain-language context, from every session; answer in any of them, or press **✕** to keep the default and send nothing. Only the session that asked receives the answer: it collects it itself, so nothing is sent between sessions, a different permission mode doesn't hold it up, and a closed session gets it when resumed. | — |
 | `spec-sharpener` | On a large, open-ended build request, has Claude ask 3-4 pointed questions before it starts. `/sharpen on\|off`. | — |
 | `review-panel` | `/review-panel` picks specialist reviewers from the diff and runs them in parallel, then verifies their findings. | the `pr-review-toolkit` and `compound-engineering` plugins |
+| `model-router` | Gives every subagent the model and effort your rules call for: reviews, security and hard bugs on the strong model at high effort, builds at medium, lookups and log triage on the fast model. Swaps out models you've banned, respects explicit choices unless you set `enforce`. `/model-router` shows the last 20 decisions and why. | `strongModel`, `fastModel`, `bannedModels`, `enforce`, `classifier` |
 
 ## Long sessions
 
@@ -42,6 +53,7 @@ In the desktop app's Code tab: + next to the prompt box → Plugins → Add mark
 | `lanes` | Several sessions in one repo: warns when another session holds a file you edit, tells both sides early when two worktrees change the same file, and holds back git commands that hit shared state (stash, reset --hard, clean, gc, removing a worktree in use). `/lanes`. | `block` |
 | `pin` | `/pin <rule>` keeps a rule word for word through every compaction (`--project` keeps it for this folder). Memory holds facts for all future sessions; pins are exact rules that must survive compaction. Suggests pins, never pins by itself. | — |
 | `keep-going` | When Claude stops to offer in-scope, reversible work it could just do ("want me to continue?"), sends it back to work. Never for real decisions, risky or outward steps, or finished work. At most twice per request, with a toast each time. | `enabled`, `maxNudges` |
+| `session-board` | `/sessions`: every Claude session from today on one board, costliest first: context size (with "handoff due"), today's usage, idle time, subagents, the last thing it said. Copy any session's resume command, or ask a running one to hand off with one press (the session needs `context-meter` for that). | `hours`, `handoffAt` |
 
 ## Cost
 
@@ -58,6 +70,7 @@ In the desktop app's Code tab: + next to the prompt box → Plugins → Add mark
 | `user-voice` | On a feature request, adds matching quotes from your notes on what users said; on a rough one, Claude proposes 2-3 concrete versions and asks once before building. "Just do it" skips that. Works alongside `spec-sharpener`. `/user-voice`. | `evidenceDir`, `maxQuotes`, `proposeFirst` |
 | `operator-context` | Gives Claude your own profile (who you are, what you own, what you authorize) as facts for its judgment that never override safety rules; lines that try to switch safety off are dropped and shown to you. `/operator`. | `profileFile`, `subagents` |
 | `twins` | Tells you when one of two copies (a live copy and a shared one, code and docs) falls behind after an edit. Never edits and never prompts Claude by itself; only `/twins sync <name>` asks Claude to port the change. | `twinsFile` (+ `~/.claude/twins.json`) |
+| `weekly-digest` | `/digest`: a plain summary of your week per repo: what shipped (merged PRs, pushed commits), what's in flight, what's waiting on you in the decision inbox, and the time and tokens each repo took. Saved as a local markdown file. Nothing leaves your machine unless you turn on `polish`, which sends folder paths, commit and PR titles and waiting decisions to a small model to write a short team or investor update. | `digestDir`, `extraRepos`, `authorEmails`, `polish` |
 
 ## Learning
 

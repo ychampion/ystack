@@ -1,0 +1,35 @@
+{
+  "name": "weekly-digest",
+  "version": "0.1.0",
+  "description": "/digest [days] writes a plain-English digest of what shipped across the repos your sessions touched: merged PRs and pushed commits, work in flight, decisions waiting on you, and time and usage per repo. Saved as markdown and shown in a pane; never sent anywhere unless you turn on polish.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "digestDir": {
+      "type": "string",
+      "title": "Digest folder",
+      "description": "Where /digest saves digest-<date>.md. ~ or a relative path starts at your home folder.",
+      "default": "~/.claude/digests"
+    },
+    "extraRepos": {
+      "type": "string",
+      "title": "Extra repos",
+      "description": "More repo folders to include, separated by commas or semicolons, even if no session ran in them.",
+      "default": ""
+    },
+    "authorEmails": {
+      "type": "string",
+      "title": "Your commit emails",
+      "description": "Your commit author emails (comma separated), matched exactly. Empty: the repo's git user.email.",
+      "default": ""
+    },
+    "polish": {
+      "type": "boolean",
+      "title": "Polished update",
+      "description": "Also ask a small model (haiku) to turn the digest into a 10-line team or investor update, shown under it. On: folder paths, commit and PR titles and open decisions go to that model. Off: no model call, nothing sent.",
+      "default": false
+    }
+  }
+}

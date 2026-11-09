@@ -22,6 +22,9 @@ let phaseEnded = false // a push or merge ran in this turn with a big context
 let userAt = 0 // when the user last sent a prompt or interrupted a turn
 let turnByUser = true // the running turn began with the user's prompt (or a mod's), not an agent report
 let autoOff = '' // why automatic handoffs stopped for this session ('' while they run)
+// The session-board mod's "Ask it to hand off" message starts with this; the turn it arrives in ends with a handoff.
+const REQUEST = '[ystack handoff request]'
+let requested = false
 let lastTokens = 0
 let saidHandoff = false
 const saidLimit = new Set<string>()
@@ -207,6 +210,7 @@ export const register: Register = (on, options) => {
     const kind = e.origin?.kind ?? ''
     const byUser = !AUTO.has(kind) && kind !== 'plugin'
     if (byUser) userAt = await $.clock.now()
+    if ((e.text ?? '').startsWith(REQUEST)) requested = true
     if (e.turnId !== undefined) {
       if (asking !== undefined) asking.arrived = true // delivered into a running turn: a swap now would erase it
     } else {
@@ -226,7 +230,20 @@ export const register: Register = (on, options) => {
     }
     if (asking !== undefined) {
       phaseEnded = false
+      requested = false
       await land($, e)
+      return done
+    }
+    // The session board asked for a handoff (the user pressed it there): do it now, once, whatever the size.
+    if (requested) {
+      requested = false
+      phaseEnded = false
+      if (e.reason === 'aborted') return done // the user interrupted: they're here, let them decide
+      if (autoOff === 'a swap failed') {
+        await $.ui.notify('Handoff requested from the session board, but a swap already failed in this session: run /clear and continue from the handoff file.', { title: 'context-meter' })
+        return done
+      }
+      await checkpoint($, 'Handoff requested from the session board.')
       return done
     }
     const tokens = (await $.session.usage()).context.tokens ?? 0

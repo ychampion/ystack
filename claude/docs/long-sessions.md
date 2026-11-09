@@ -30,6 +30,26 @@ So a session's cost per call grows with its context. One call at 300k re-reads a
 
 What actually drove the cost was long sessions running near the compaction limit for days, and subagents doing the same. How often anyone typed made little difference.
 
+## What the new rules would have saved
+
+The same 14 days replayed call by call, with the real growth of each call kept and only the reset rules changed:
+
+| | As logged | With ystack's rules | Less |
+| --- | --- | --- | --- |
+| Main sessions: hand off at 252k (to ~35k, counting the checkpoint turn) instead of compacting near 365k | 504M | 405M | **20%** |
+| Subagents: compact at 250k (to ~85k) instead of 400k | 1,398M | 1,207M | **14%** |
+| **Total** | **1,902M** | **1,611M** | **15%** |
+
+The figures are input-token equivalents, priced as in the table above.
+
+Read it as a rough estimate:
+
+- The main-session figure assumes a handoff at every crossing of 252k, so it's the optimistic end.
+- The subagent figure is solid, because compaction there is automatic.
+- It leaves out two changes made earlier that a replay can't model: building at medium effort instead of high, and turning agent teams off. Each was large on its own: high-effort subagents made 59% of one day's usage, and teammates' idle pings made 32% of one 9-day session.
+
+`/ystack-stats` runs this same replay on your own logs.
+
 ## Handoff or compaction?
 
 Both shrink a big context. They differ in what triggers them and what they keep.

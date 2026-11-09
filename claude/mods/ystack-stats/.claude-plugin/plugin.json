@@ -1,0 +1,17 @@
+{
+  "name": "ystack-stats",
+  "version": "0.1.0",
+  "description": "/ystack-stats shows what ystack saves you, from your own logs: your last days of API calls re-priced under ystack's rules, and real usage per active hour before and after you installed it. '/ystack-stats share' prints a paste-ready summary with numbers only.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "days": {
+      "type": "number",
+      "title": "Days to count",
+      "description": "How many days of logs the what-if replay re-prices (1-90). The before/after view uses up to this many days on each side of the install.",
+      "default": 14
+    }
+  }
+}

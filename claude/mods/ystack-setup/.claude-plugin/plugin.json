@@ -1,0 +1,17 @@
+{
+  "name": "ystack-setup",
+  "version": "0.1.0",
+  "description": "/ystack-setup lists recommended Claude Code settings (auto-compact windows, two subagent types, agent teams off, subagent model), shows which are already in place, and applies only the ones you tick when you press Apply, with backups and Undo. /ystack-setup check prints a text report.",
+  "author": {
+    "name": "ychampion"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "haikuModel": {
+      "type": "string",
+      "title": "Haiku model id",
+      "description": "The Haiku model the 100k auto-compact item sets. ANTHROPIC_DEFAULT_HAIKU_MODEL, when set, wins over this.",
+      "default": "claude-haiku-5-5"
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "name": "model-router",
+  "version": "0.1.0",
+  "description": "Gives every subagent the right model and effort from a routing table you control: reviews, security and hard bugs on the strong model at high effort, builds and fixes at medium, lookups and log triage on the small fast model. Replaces banned models and keeps explicit choices.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "strongModel": {
+      "type": "string",
+      "title": "Strong model",
+      "description": "Alias or full model id for the high and medium tiers, and what a banned model is replaced with. Empty: leave the model to the session (or CLAUDE_CODE_SUBAGENT_MODEL) and set only effort.",
+      "default": ""
+    },
+    "fastModel": {
+      "type": "string",
+      "title": "Small fast model",
+      "description": "Alias or full model id for lookups, log triage, classification, reshaping data and polling.",
+      "default": "haiku"
+    },
+    "highEffort": {
+      "type": "string",
+      "title": "High tier effort",
+      "description": "Effort for verification, review, security, unknown-cause bugs, concurrency and parsers.",
+      "options": ["low", "medium", "high", "xhigh", "max"],
+      "default": "high"
+    },
+    "mediumEffort": {
+      "type": "string",
+      "title": "Medium tier effort",
+      "description": "Effort for builds, features, refactors, tests, docs, research and fix rounds.",
+      "options": ["low", "medium", "high", "xhigh", "max"],
+      "default": "medium"
+    },
+    "highKeywords": {
+      "type": "string",
+      "title": "Extra high-tier keywords",
+      "description": "Comma-separated words or phrases added to the built-in rules for the high tier.",
+      "default": ""
+    },
+    "mediumKeywords": {
+      "type": "string",
+      "title": "Extra medium-tier keywords",
+      "description": "Comma-separated words or phrases added to the built-in rules for the medium tier.",
+      "default": ""
+    },
+    "fastKeywords": {
+      "type": "string",
+      "title": "Extra fast-tier keywords",
+      "description": "Comma-separated words or phrases added to the built-in rules for the small fast model.",
+      "default": ""
+    },
+    "unmatched": {
+      "type": "string",
+      "title": "When no rule matches",
+      "description": "medium: route it like a build. leave: don't touch it.",
+      "options": ["medium", "leave"],
+      "default": "medium"
+    },
+    "bannedModels": {
+      "type": "string",
+      "title": "Banned models",
+      "description": "Comma-separated aliases or id parts (sonnet, claude-x-1). A subagent asking for one runs on the strong model (or the first allowed fallback), with a note.",
+      "default": ""
+    },
+    "fallbackModels": {
+      "type": "string",
+      "title": "Fallback models",
+      "description": "Comma-separated, tried in order when a banned model must be replaced and the strong model is unset or banned too.",
+      "default": "opus, sonnet, haiku"
+    },
+    "genericTypes": {
+      "type": "string",
+      "title": "Agent types to route",
+      "description": "Comma-separated agent types the router may set model and effort for. Any other type the caller names keeps its own (banned models are still replaced).",
+      "default": "general-purpose"
+    },
+    "enforce": {
+      "type": "boolean",
+      "title": "Enforce the table",
+      "description": "Off: a model, effort or agent type the caller chose stands. On: the table wins every time.",
+      "default": false
+    },
+    "classifier": {
+      "type": "string",
+      "title": "Classifier for unmatched tasks",
+      "description": "off: keyword rules only, nothing is sent anywhere. haiku: one call to the small fast model for a task no rule matched.",
+      "options": ["off", "haiku"],
+      "default": "off"
+    }
+  }
+}

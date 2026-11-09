@@ -1,0 +1,28 @@
+{
+  "name": "push-guard",
+  "version": "0.1.0",
+  "description": "Stops the git and GitHub accidents that are hard to undo, in the main session and every subagent: keys in a commit or push, making a repo public, force-pushing to a protected branch, and deleting remote branches or repos. It says why and how to go on safely.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "protectedBranches": {
+      "type": "string",
+      "title": "Protected branches",
+      "description": "Comma-separated branch names or globs (release/*) that Claude may never force-push.",
+      "default": "main, master"
+    },
+    "protectedRepos": {
+      "type": "string",
+      "title": "Protected repos",
+      "description": "Comma-separated owner/name list, or * for all, that Claude may never make public. Other repos need your /push-guard allow public <repo> first.",
+      "default": ""
+    },
+    "allowPaths": {
+      "type": "string",
+      "title": "Paths the key scan skips",
+      "description": "Comma-separated paths or globs (tests/fixtures/**, *.snap) whose fake keys should not stop a commit or push.",
+      "default": ""
+    }
+  }
+}

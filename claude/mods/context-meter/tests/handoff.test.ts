@@ -240,6 +240,35 @@ test('an automatic checkpoint that gets no handoff back stops automatic handoffs
   expect(said(seen)).toContain('no handoff came back')
 })
 
+const BOARD = '[ystack handoff request] The user pressed "Ask it to hand off" on the session board in another session.'
+
+test('a session-board request hands off once when its turn ends, and the away rule does not fire a second checkpoint', async ($, on) => {
+  const { clock, seen } = await setup($, on, { ctx: 150_000 })
+  await clock.advance(20 * 60_000)
+  await $.prompt.submit({ text: BOARD, origin: { kind: 'peer' } } as never)
+  await $.turn.complete(done('Finishing this step; handing off.', 't1'))
+  expect(asked(seen)).toBe(1)
+  await $.turn.complete(done(DOC))
+  expect(said(seen)).toContain('Handoff requested from the session board')
+  expect(said(seen)).toContain('Handed off')
+  expect(asked(seen)).toBe(1)
+})
+
+test('a request delivered into a running turn hands off when that turn ends', async ($, on) => {
+  const { seen } = await setup($, on)
+  await $.prompt.submit({ text: 'do the thing', origin: { kind: 'composer' } } as never)
+  await $.prompt.submit({ text: BOARD, origin: { kind: 'peer' }, turnId: 't1' } as never)
+  await $.turn.complete(done('Did the thing.', 't1'))
+  expect(asked(seen)).toBe(1)
+})
+
+test('Esc on the request turn cancels the requested handoff', async ($, on) => {
+  const { seen } = await setup($, on)
+  await $.prompt.submit({ text: BOARD, origin: { kind: 'peer' } } as never)
+  await $.turn.complete(done('', 't2', 'aborted'))
+  expect(asked(seen)).toBe(0)
+})
+
 test('autoHandoff off: nothing hands off by itself; /handoff still works', { options: { autoHandoff: false } }, async ($, on) => {
   const { clock, seen } = await setup($, on)
   await $.tool.call({ tool: 'Bash', command: 'git push origin main' } as never)

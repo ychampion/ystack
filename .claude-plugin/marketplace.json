@@ -108,6 +108,30 @@
     {
       "name": "twins",
       "source": "./claude/mods/twins"
+    },
+    {
+      "name": "ystack-stats",
+      "source": "./claude/mods/ystack-stats"
+    },
+    {
+      "name": "ystack-setup",
+      "source": "./claude/mods/ystack-setup"
+    },
+    {
+      "name": "push-guard",
+      "source": "./claude/mods/push-guard"
+    },
+    {
+      "name": "model-router",
+      "source": "./claude/mods/model-router"
+    },
+    {
+      "name": "session-board",
+      "source": "./claude/mods/session-board"
+    },
+    {
+      "name": "weekly-digest",
+      "source": "./claude/mods/weekly-digest"
     }
   ]
 }
