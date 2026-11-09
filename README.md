@@ -50,7 +50,7 @@ On macOS and Linux the skills are symlinks into the checkout, so `git pull` upda
 | `--dry-run` | Show what would change, change nothing |
 | `--uninstall` | Remove only what ystack installed |
 
-Setup never overwrites a skill or agent file that is yours, including a ystack skill you have edited: it skips it and says so. If any step fails it says which and exits 1. `--force` replaces it after moving yours to `~/.ystack-backup/`.
+Setup never overwrites a skill or agent file that is yours, including a ystack skill you have edited: it skips it and says so, and `--force` replaces it after moving yours to `~/.ystack-backup/`. If any step fails, setup names it and exits 1.
 
 The starter mods are `ystack-stats`, `ystack-setup`, `context-meter`, `verify`, `push-guard` and `model-router`. Then:
 
