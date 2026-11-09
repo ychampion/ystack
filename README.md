@@ -6,8 +6,9 @@ It is general on purpose. Nothing in here is tied to one person's machine: anyth
 
 ## Why use it
 
-The numbers below come from one heavy user's own logs: 14 days of Claude Code on Opus, about 60,000 API calls. Each one is measured or replayed, and the write-ups say which.
+The numbers below come from one heavy user's own logs. Each one is measured or replayed, and the write-ups say which.
 
+- **An hour of work costs ~78% less; each API call ~39% less.** Across about 248,000 real API calls from September to November, usage per active hour fell from 38.4M to 8.3M input-token equivalents as these rules and mods went in, and the median context per call halved (375k to 189k). Per hour also reflects running fewer agents at once, and only 37 hours of the earliest logs survive, so read 78% as the upper end and 39% per call as the firm floor. [The full table.](claude/docs/long-sessions.md#before-and-after-on-real-usage)
 - **Most usage isn't where you'd think.** Subagents made 73% of it. Six sessions running for days near the compaction limit made 91%. The mods' own prompt text was 0.3%.
 - **Resetting context at the right moment saves ~15%.** Replaying those 14 days with handoffs at 252k and subagents compacting at 250k cut usage from 1.90B to 1.61B input-token equivalents. `context-meter` does the handoffs by itself, between turns, without `/clear`.
 - **Two settings were costly and easy to fix.** Agent-team idle pings made 32% of one 9-day session. High-effort subagents made 59% of one day, mostly on work medium effort handles. `/ystack-setup` offers the fixes; `model-router` enforces them per task.

@@ -50,6 +50,26 @@ Read it as a rough estimate:
 
 `/ystack-stats` runs this same replay on your own logs.
 
+## Before and after, on real usage
+
+The replay changes one thing and holds the rest still. This section is the opposite: what usage actually did, as logged, while the rules went in over two months. About 248,000 API calls (main sessions and subagents, de-duplicated), priced as above. An active hour is a clock hour with at least one call.
+
+| Period | Active hours | Per active hour | Median hour | Per API call | Median context per call |
+| --- | --- | --- | --- | --- | --- |
+| Before the rules (to Sep 23) | 37 | 38.4M | 27.7M | 51.8k | 375k |
+| Rules written in CLAUDE.md only (Sep 24 to Nov 6) | 510 | 13.9M | 9.0M | 34.8k | 209k |
+| Rules enforced by the mods (Nov 7 on) | 63 | 8.3M | 6.8M | 31.4k | 189k |
+| **Change, first to last** | | **−78%** | **−75%** | **−39%** | **−50%** |
+
+How far to trust it:
+
+- **Per call (−39%) is the firm number.** It tracks context size, which is what the reset rules change, and it moves little with how much work runs at once.
+- **Per hour (−78%) is the upper end.** September was mostly large parallel swarms (95% of calls from subagents, against 78% now), so part of the drop is running fewer agents at once, a habit the rules encourage but don't force.
+- **The earliest period is thin.** Only 37 active hours of September logs survive, below the 50 hours `/ystack-stats` asks for on each side of a split.
+- **Writing the rules down did most of it; the mods added the rest.** From the middle period to the last, per hour fell another 40% and per call another 10%, over only 63 hours so far.
+
+`/ystack-stats` shows the same before-and-after on your own logs once you have used ystack for a few days.
+
 ## Handoff or compaction?
 
 Both shrink a big context. They differ in what triggers them and what they keep.
