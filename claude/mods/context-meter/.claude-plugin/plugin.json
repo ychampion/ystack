@@ -1,7 +1,7 @@
 {
   "name": "context-meter",
-  "version": "0.3.1",
-  "description": "Keeps long sessions cheap. /handoff writes a handoff in one turn and swaps the conversation in place for it (no /clear; background agents keep reporting). Hands off by itself between turns: after a push or merge on a big context, before the prompt cache lapses on an idle one, and when a session is running on its own. Speaks once at the handoff mark and near usage limits; /ctx shows size, limits and cost.",
+  "version": "0.4.0",
+  "description": "Keeps long sessions cheap. /handoff writes a handoff in one turn and swaps the conversation in place for it (no /clear; background agents keep reporting). Between turns it acts by itself: hands off after a push or merge on a big context or when a session is running on its own, and before the prompt cache lapses on an idle one it compacts if work is half done or hands off if not. Speaks once at the handoff mark and near usage limits; /ctx shows size, limits and cost.",
   "author": {
     "name": "ychampion"
   },
@@ -27,8 +27,14 @@
     "autoHandoff": {
       "type": "boolean",
       "title": "Automatic handoffs",
-      "description": "Hand off by itself between turns: after a push or merge past the handoff mark, after 50 minutes idle on 200k+, and when a turn started by an agent report, another session or a schedule ends past the mark while you haven't typed for 15 minutes. Off: only /handoff.",
+      "description": "Act by itself between turns: hand off after a push or merge past the handoff mark, and when a turn started by an agent report, another session or a schedule ends past the mark while you haven't typed for 15 minutes; after 50 minutes idle on 200k+, do what 'When idle' says. Off: only /handoff.",
       "default": true
+    },
+    "idleAction": {
+      "type": "string",
+      "title": "When idle",
+      "description": "What runs after 50 minutes idle on 200k+, before the prompt cache lapses. auto: compact when work is half done (files edited since the last commit or push, or the last turn was cut short), hand off otherwise; also compact when handoffs have stopped for the session. compact: always Claude Code's own compaction (keeps the last messages word for word, leaves ~100k). handoff: always a handoff (leaves ~35k).",
+      "default": "auto"
     }
   }
 }

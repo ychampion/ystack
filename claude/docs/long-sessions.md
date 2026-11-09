@@ -86,7 +86,7 @@ Use them like this:
 - **Under ~150k:** do nothing. A reset saves little, and catching up costs more.
 - **A phase is done and the context is over ~250k:** hand off.
 - **In the middle of a task:** let compaction handle it. Keeping the last messages word for word matters while work is half done. You can steer it with `/compact keep the failing test names`.
-- **Stepping away for more than an hour:** hand off before you go. See the next section.
+- **Stepping away for more than an hour:** reset before the cache lapses. `context-meter` does it for you at 50 minutes idle; see the next section for which reset it picks.
 - **A new, unrelated task:** `/clear`. Nothing needs to carry over.
 - **Subagents:** compaction only. Lowering their window (for example `autoCompactWindow: 250000` in an agent's file) is the lever that measured −26%.
 
@@ -96,12 +96,25 @@ The cache keeps your context for an hour. Come back after that, and the first ca
 
 A handoff written *after* the hour pays that same 600k rewrite once, because writing it means reading the conversation. It still pays off if real work follows, since every later call is small. But the cheap moment is before the cache lapses.
 
+### Idle compaction or idle handoff?
+
+Both read the context once at the cached price, before the hour is up. The difference is what's left when you come back, because that gets rewritten at 2× on your first call:
+
+| At 300k, idle 50 minutes | Idle handoff | Idle compaction |
+| --- | --- | --- |
+| Left afterwards | ~35k: the handoff document and the last reply | ~100k: a summary plus the last messages word for word |
+| Your first call back | ~70k | ~200k |
+| Each later call, until it regrows | ~3.5k of re-reads | ~10k |
+| What it keeps | What the document says; files get re-read | Recent tool output, diffs and errors, as they were |
+
+A handoff costs less, so it's the right call when a piece of work is finished. A compaction is the right call when you walked away halfway through an edit or a debugging run, because the exact recent output is what you need to carry on. So `context-meter`'s default (`idleAction: auto`) compacts when work is half done (files edited since the last commit or push, or the last turn was cut short) and hands off otherwise. It also compacts when handoffs have stopped for the session, since compaction doesn't depend on them. Set `idleAction` to `compact` or `handoff` to always use one.
+
 ## What `context-meter` does about it
 
 - **`/handoff`.** One turn writes the handoff and saves it to `<handoffDir>/<project>-handoff.md`. The mod then replaces the conversation in place with that document and your last reply. You don't need `/clear`, it's the same session, and background agents still report back to it.
 - **Automatic handoffs** (setting `autoHandoff`, on by default). Each one runs only between turns, never inside one:
   - a turn that ran `git push` or `gh pr merge/create` ends with the context past your handoff mark;
-  - the session has sat idle 50 minutes on 200k+, before the cache lapses;
+  - the session has sat idle 50 minutes on 200k+, before the cache lapses (this one compacts instead when work is half done; see above);
   - the session is running on its own: a turn started by an agent's report, another session or a schedule ends past the mark, and you haven't typed for 15 minutes. A turn you started never triggers it.
 - **Its own warnings.** It speaks once at the handoff mark and once when a usage limit nears 90%, and `/ctx` shows the context size, limits and cost.
 

@@ -1,13 +1,13 @@
 import { type TestBody, expect, mock, test } from 'claude-code/testing'
 
-import { handoffIn, swapIn } from '../hooks/register.ts'
+import { handoffIn, idleChoice, swapIn } from '../hooks/register.ts'
 
 type $T = Parameters<TestBody>[0]
 type OnT = Parameters<TestBody>[1]
 
 const DOC = '# work handoff\n## Goal\nShip it.\n## Running now\nagent a2 (ag-2): reports the deploy.\n## Waiting on the user\nNothing.\n## Next steps\n1. Deploy.'
 
-async function setup($: $T, on: OnT, { ctx = 300_000 } = {}) {
+async function setup($: $T, on: OnT, { ctx = 300_000, failEdits = false } = {}) {
   const clock = mock.clock(on, { now: 1_000 })
   const seen = { writes: [] as { path: string; text: string }[], core: 0, notes: [] as string[], toasts: [] as string[], prompts: [] as string[] }
   on('command.register', () => ({ value: undefined }) as never)
@@ -45,7 +45,9 @@ async function setup($: $T, on: OnT, { ctx = 300_000 } = {}) {
     seen.prompts.push(e.text)
     return { text: e.text } as never
   })
-  on('tool.call', () => ({ result: { stdout: 'ok' }, text: 'ok' }) as never)
+  on('tool.call', (_, e) =>
+    (failEdits && e.tool === 'Edit' ? { result: { error: 'old_string not found' }, text: 'old_string not found', isError: true } : { result: { stdout: 'ok' }, text: 'ok' }) as never,
+  )
   await $.session.start({ cwd: '/home/me/work', surface: 'terminal', isInteractive: true })
   return { clock, seen }
 }
@@ -296,4 +298,115 @@ test('the checkpoint asks for what an orchestrator needs to judge reports after 
   expect(p).toContain('its brief in one line')
   expect(p).toContain('where it writes its output')
   expect(p).toContain('scratchpad files')
+})
+
+// Idle: a handoff leaves less, a compaction keeps the last messages word for word. Mid-task gets the compaction.
+
+test('idle choice: auto compacts mid-task and when handoffs have stopped, hands off otherwise; explicit settings win', () => {
+  expect(idleChoice({ action: 'auto', midTask: false, handoffsOn: true })).toBe('handoff')
+  expect(idleChoice({ action: 'auto', midTask: true, handoffsOn: true })).toBe('compact')
+  expect(idleChoice({ action: 'auto', midTask: false, handoffsOn: false })).toBe('compact')
+  expect(idleChoice({ action: 'compact', midTask: false, handoffsOn: true })).toBe('compact')
+  expect(idleChoice({ action: 'handoff', midTask: true, handoffsOn: true })).toBe('handoff')
+  expect(idleChoice({ action: 'handoff', midTask: true, handoffsOn: false })).toBe(undefined)
+})
+
+test('idle mid-task (files edited, nothing committed): compacts with the engine instead of handing off', async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.tool.call({ tool: 'Edit', file_path: '/home/me/work/a.ts' } as never)
+  await $.turn.complete(done('Half done: the parser compiles, two tests still fail.', 't1'))
+  await clock.advance(50 * 60_000)
+  expect(asked(seen)).toBe(0)
+  expect(seen.core).toBe(1)
+  expect(said(seen)).toContain('mid-task: compacted before the cache lapsed (300k → 99k)')
+  await clock.advance(3 * 60 * 60_000) // nothing more while away
+  expect(seen.core).toBe(1)
+  expect(asked(seen)).toBe(0)
+})
+
+test('edits that were then committed count as a boundary: idle hands off', async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.tool.call({ tool: 'Write', file_path: '/home/me/work/a.ts' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'git add -A && git -c user.name=me commit -m "parser"' } as never)
+  await $.turn.complete(done('Committed.', 't1'))
+  await clock.advance(50 * 60_000)
+  expect(seen.core).toBe(0)
+  expect(asked(seen)).toBe(1)
+})
+
+test('a subagent commit also counts', async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.tool.call({ tool: 'Edit', file_path: '/home/me/work/a.ts', agentId: 'ag-1' } as never)
+  await $.tool.call({ tool: 'PowerShell', command: 'git -C C:/work commit -am wip', agentId: 'ag-1' } as never)
+  await $.turn.complete(done('Agent finished.', 't1'))
+  await clock.advance(50 * 60_000)
+  expect(asked(seen)).toBe(1)
+})
+
+test('a failed edit does not count as work under way', async ($, on) => {
+  const { clock, seen } = await setup($, on, { failEdits: true })
+  await $.tool.call({ tool: 'Edit', file_path: '/home/me/work/a.ts' } as never)
+  await $.turn.complete(done('x', 't1'))
+  await clock.advance(50 * 60_000)
+  expect(seen.core).toBe(0)
+  expect(asked(seen)).toBe(1)
+})
+
+test('a turn that was cut short counts as mid-task: idle compacts', async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.turn.complete(done('', 't1', 'error'))
+  await clock.advance(50 * 60_000)
+  expect(seen.core).toBe(1)
+  expect(asked(seen)).toBe(0)
+})
+
+test('a small context neither compacts nor hands off when idle', async ($, on) => {
+  const { clock, seen } = await setup($, on, { ctx: 150_000 })
+  await $.tool.call({ tool: 'Edit', file_path: '/home/me/work/a.ts' } as never)
+  await $.turn.complete(done('x', 't1'))
+  await clock.advance(60 * 60_000)
+  expect(seen.core).toBe(0)
+  expect(asked(seen)).toBe(0)
+})
+
+test('after automatic handoffs stop, an idle session still compacts', async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await clock.advance(20 * 60_000)
+  for (let i = 1; i <= 4; i++) {
+    await $.prompt.submit({ text: `agent ${i} done`, origin: { kind: 'task-notification' } } as never)
+    await $.turn.complete(done('merged', `t${i}`))
+  }
+  expect(said(seen)).toContain('no handoff came back')
+  await $.prompt.submit({ text: 'thanks' } as never)
+  await $.turn.complete(done('ok', 't5'))
+  await clock.advance(50 * 60_000)
+  expect(asked(seen)).toBe(1)
+  expect(seen.core).toBe(1)
+  expect(said(seen)).toContain('handoffs off (no handoff came back): compacted')
+})
+
+test('idleAction compact: compacts at a boundary too', { options: { idleAction: 'compact' } }, async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.turn.complete(done('All done and pushed.', 't1'))
+  await clock.advance(50 * 60_000)
+  expect(seen.core).toBe(1)
+  expect(asked(seen)).toBe(0)
+})
+
+test('idleAction handoff: hands off mid-task too', { options: { idleAction: 'handoff' } }, async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.tool.call({ tool: 'Edit', file_path: '/home/me/work/a.ts' } as never)
+  await $.turn.complete(done('Half done.', 't1'))
+  await clock.advance(50 * 60_000)
+  expect(seen.core).toBe(0)
+  expect(asked(seen)).toBe(1)
+})
+
+test('autoHandoff off: idle does nothing, mid-task or not', { options: { autoHandoff: false } }, async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.tool.call({ tool: 'Edit', file_path: '/home/me/work/a.ts' } as never)
+  await $.turn.complete(done('Half done.', 't1'))
+  await clock.advance(60 * 60_000)
+  expect(seen.core).toBe(0)
+  expect(asked(seen)).toBe(0)
 })

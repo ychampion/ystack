@@ -1,17 +1,29 @@
 import type { EngineInterface, Register, SessionUsage, Timer } from 'claude-code'
 
 // Every turn re-reads the whole context, so a big one costs on every call: hand off at a boundary, not at the limit.
-// Thresholds and the folder are settings (handoffAt, compactAt, handoffDir, autoHandoff); defaults suit a 400k window.
+// Thresholds and the folder are settings (handoffAt, compactAt, handoffDir, autoHandoff, idleAction); defaults suit a 400k window.
 let HANDOFF_AT = 250_000
 let COMPACT_AT = 400_000
 let HANDOFF_DIR = '~/.claude/plans'
 let AUTO_HANDOFF = true
+// What runs when a big context sits idle. A handoff leaves ~35k, a compaction ~100k, so a handoff is cheaper;
+// a compaction keeps the last messages word for word, which matters when work is half done.
+// auto: compact mid-task, hand off at a boundary. compact / handoff: always that one.
+type IdleAction = 'auto' | 'compact' | 'handoff'
+let IDLE_ACTION: IdleAction = 'auto'
+const OFF_IN_SETTINGS = 'turned off in settings'
 const IDLE_AT = 200_000 // below this, re-caching after a break costs little
-const IDLE_MS = 50 * 60_000 // the prompt cache lapses after 1h idle: hand off while it is still warm
+const IDLE_MS = 50 * 60_000 // the prompt cache lapses after 1h idle: reset while it is still warm
 const AWAY_MS = 15 * 60_000 // the user hasn't typed for this long: the session is running on its own
 // Prompt origins that are machines, not the user. Anything else (typed, Slack ping, unknown) counts as the user.
 const AUTO = new Set(['task-notification', 'scheduled-trigger', 'peer', 'peer-send-message', 'projects-relay', 'coordinator', 'observer', 'observer-activity'])
 const MAX_WAIT_TURNS = 3 // other turns that may finish before the checkpoint's own does
+const EDIT_TOOLS = ['Edit', 'Write', 'NotebookEdit'] as const
+// The git subcommand, also with options before it (`git -c name=x <sub>`, `git -C dir <sub>`).
+const GIT = (sub: string) => new RegExp(`\\bgit\\b(?:\\s+-[cC]\\s+\\S+)*\\s+(?:${sub})\\b`)
+const PUSH = GIT('push')
+const SAVED = GIT('commit|push')
+const IDLE_COMPACT = 'The user stepped away in the middle of this task and will pick it up when back. Keep: the task and what done means; files changed and why; what is verified and what is not; failing tests and errors word for word; background agents still running (id, what they will report); decisions waiting on the user; the exact next step.'
 
 const k = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : `${Math.round(n / 1000)}k`)
 
@@ -22,6 +34,8 @@ let phaseEnded = false // a push or merge ran in this turn with a big context
 let userAt = 0 // when the user last sent a prompt or interrupted a turn
 let turnByUser = true // the running turn began with the user's prompt (or a mod's), not an agent report
 let autoOff = '' // why automatic handoffs stopped for this session ('' while they run)
+let edited = false // files were edited since the last commit or push: the work is half done
+let cutShort = false // the last main-loop turn was interrupted or failed
 // The session-board mod's "Ask it to hand off" message starts with this; the turn it arrives in ends with a handoff.
 const REQUEST = '[ystack handoff request]'
 let requested = false
@@ -146,15 +160,49 @@ async function land($: EngineInterface, e: { reason?: string; answer: string }):
   await say(await swapNow($, { path, doc, last: a.last, before: a.before }))
 }
 
+/** Which reset an idle session gets, or none. Mid-task: uncommitted edits or a turn cut short. */
+export const idleChoice = (s: { action: IdleAction; midTask: boolean; handoffsOn: boolean }): 'compact' | 'handoff' | undefined => {
+  if (s.action === 'compact') return 'compact'
+  if (s.action === 'handoff') return s.handoffsOn ? 'handoff' : undefined
+  return s.midTask || !s.handoffsOn ? 'compact' : 'handoff' // a compaction still works when handoffs have stopped
+}
+
+/** 50 minutes idle: compact or hand off while the cache is warm, so coming back doesn't rewrite the whole context at 2x. */
+async function idle($: EngineInterface): Promise<void> {
+  if (autoOff === OFF_IN_SETTINGS || asking !== undefined) return
+  const tokens = (await $.session.usage()).context.tokens ?? 0
+  if (tokens < IDLE_AT) return
+  const midTask = edited || cutShort
+  const how = idleChoice({ action: IDLE_ACTION, midTask, handoffsOn: !autoOff })
+  if (how === undefined) return
+  if (how === 'handoff') {
+    await checkpoint($, `Idle 50 min at ${k(tokens)}: handed off before the cache lapsed.`)
+    return
+  }
+  const why = IDLE_ACTION === 'compact' ? '' : midTask ? ', mid-task' : `, handoffs off (${autoOff})`
+  let text: string
+  try {
+    const c = await $.session.compact({ instructions: IDLE_COMPACT })
+    text =
+      c.skip !== undefined
+        ? `Idle 50 min at ${k(tokens)}: the compaction was skipped (${c.skip}).`
+        : `Idle 50 min at ${k(tokens)}${why}: compacted before the cache lapsed (${k(tokens)} → ${c.tokensAfter ? k(c.tokensAfter) : 'smaller'}), keeping the last messages word for word. /handoff for a smaller reset.`
+  } catch (err) {
+    text = `Idle 50 min at ${k(tokens)}: the compaction didn't run (${err instanceof Error ? err.message : String(err)}).`
+  }
+  await $.ui.notify(text, { title: 'context-meter' })
+}
+
 export const register: Register = (on, options) => {
   const num = (v: unknown, d: number) => (typeof v === 'number' && v > 0 ? v : d)
   HANDOFF_AT = num(options.handoffAt, HANDOFF_AT)
   COMPACT_AT = num(options.compactAt, COMPACT_AT)
   if (typeof options.handoffDir === 'string' && options.handoffDir.trim()) HANDOFF_DIR = options.handoffDir.trim().replace(/\\/g, '/').replace(/\/+$/, '')
   if (options.autoHandoff === false) AUTO_HANDOFF = false
+  if (options.idleAction === 'compact' || options.idleAction === 'handoff') IDLE_ACTION = options.idleAction
 
   on('session.start', async ($, e, next) => {
-    if (!AUTO_HANDOFF) autoOff = 'turned off in settings'
+    if (!AUTO_HANDOFF) autoOff = OFF_IN_SETTINGS
     await $.command.register({ name: 'handoff', description: 'Write the phase handoff and continue from it alone (no /clear; running agents keep reporting)' })
     await $.command.register({ name: 'ctx', description: 'Context size, usage limits and session cost, once' })
     $.ui.status(undefined) // clear the line an earlier version pinned
@@ -198,10 +246,19 @@ export const register: Register = (on, options) => {
   // A push or merge often ends a phase: with a big context, hand off once the turn ends.
   on('tool.call', { tool: ['Bash', 'PowerShell'] }, async ($, e, next) => {
     const ran = await next(e)
-    if (e.agentId !== undefined || ran.isError === true || ran.deny !== undefined) return ran
-    if (!/\bgit\s+push\b|\bgh\s+pr\s+(merge|create)\b/.test(e.command)) return ran
+    if (ran.isError === true || ran.deny !== undefined) return ran
+    if (SAVED.test(e.command)) edited = false // any loop's commit or push: the edits are saved
+    if (e.agentId !== undefined) return ran
+    if (!PUSH.test(e.command) && !/\bgh\s+pr\s+(merge|create)\b/.test(e.command)) return ran
     const { context } = await $.session.usage()
     if ((context.tokens ?? 0) >= HANDOFF_AT) phaseEnded = true
+    return ran
+  })
+
+  // Edits by the main loop or a subagent mean work is under way until a commit or push.
+  on('tool.call', { tool: EDIT_TOOLS }, async ($, e, next) => {
+    const ran = await next(e)
+    if (ran.isError !== true && ran.deny === undefined) edited = true
     return ran
   })
 
@@ -224,6 +281,7 @@ export const register: Register = (on, options) => {
     if (e.agentId !== undefined) return done
     idleTimer?.cancel()
     const now = await $.clock.now()
+    cutShort = e.reason !== undefined && e.reason !== 'answer'
     if (e.reason === 'aborted') {
       userAt = now // the user pressed Esc: they're here
       phaseEnded = false
@@ -259,15 +317,8 @@ export const register: Register = (on, options) => {
       await checkpoint($, `Running on its own at ${k(tokens)} (no message from you in 15+ min): handed off between turns.`)
       return done
     }
-    // Before the cache lapses on a big context, hand off: the checkpoint turn still reads it at the cached price.
-    idleTimer = $.clock.after(IDLE_MS, () => {
-      void (async () => {
-        if (autoOff) return
-        const { context } = await $.session.usage()
-        if ((context.tokens ?? 0) < IDLE_AT) return
-        await checkpoint($, `Idle 50 min at ${k(context.tokens ?? 0)}: handed off before the cache lapsed.`)
-      })()
-    })
+    // Before the cache lapses on a big context, shrink it: either way it is read once more at the cached price.
+    idleTimer = $.clock.after(IDLE_MS, () => void idle($))
     return done
   })
 }
