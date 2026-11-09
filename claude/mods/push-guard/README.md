@@ -18,6 +18,7 @@ Allows last for the session and only count when you type them; Claude can't allo
 
 | Setting | Default | |
 | --- | --- | --- |
+| `mode` | `block` | `warn`: nothing is refused. The command runs, and Claude is told what push-guard would have stopped, so it can check and tell you. For setups where agents do all git work. |
 | `protectedBranches` | `main, master` | Comma-separated names or globs (`release/*`). |
 | `protectedRepos` | (none) | Comma-separated `owner/name`, or `*` for all. |
 | `allowPaths` | (none) | Paths or globs the key scan skips (`tests/fixtures/**`). |

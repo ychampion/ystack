@@ -71,7 +71,28 @@ test('enforce: the table wins over explicit choices', { options: { enforce: true
   await $.tool.call(agent('Review the auth diff', 'Careful.', { model: 'haiku', effort: 'low' }))
   expect(seen.tool[0]).toMatchObject({ model: 'opus', effort: 'high' })
   await $.tool.call(agent('Locate files', 'Paths.', { subagent_type: 'my-team:helper' }))
-  expect(seen.tool[1]?.model).toBe('haiku')
+  expect(seen.tool[1]?.model).toBeUndefined()
+})
+
+test('enforce with listed agent types: a build sent to a high type runs at medium; another type is left alone', { options: { enforce: true, genericTypes: 'general-purpose, opus-high, opus-medium', reviewTier: 'medium' } }, async ($, on) => {
+  const seen = host(on)
+  await $.tool.call(agent('Build the settings page', 'Spec below.', { subagent_type: 'opus-high' }))
+  expect(seen.tool[0]).toMatchObject({ subagent_type: 'opus-high', effort: 'medium' })
+  await $.tool.call(agent('Review PR 412', 'Diff below.', { subagent_type: 'opus-high' }))
+  expect(seen.tool[1]?.effort).toBe('medium')
+  await $.tool.call(agent('Security review of the login flow', 'Diff below.', { subagent_type: 'opus-medium' }))
+  expect(seen.tool[2]?.effort).toBe('high')
+  await $.tool.call(agent('Review the config parser', 'Diff below.', { subagent_type: 'opus-medium' }))
+  expect(seen.tool[3]?.effort).toBe('high')
+  await $.tool.call(agent('Locate the auth files', 'Paths.', { subagent_type: 'haiku-max' }))
+  expect(seen.tool[4]?.effort).toBeUndefined()
+  expect(seen.tool[4]?.model).toBeUndefined()
+})
+
+test('reviewTier high (default): a plain review stays at high effort', async ($, on) => {
+  const seen = host(on)
+  await $.tool.call(agent('Review PR 412', 'Diff below.'))
+  expect(seen.tool[0]?.effort).toBe('high')
 })
 
 test('model ids and efforts come from settings; a full id is applied at the spawn', { options: { strongModel: 'some-strong-model-1', fastModel: 'some-fast-model-1', mediumEffort: 'high' } }, async ($, on) => {

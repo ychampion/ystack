@@ -404,6 +404,22 @@ test('S8 text that only mentions a risky git command (a heredoc, a commit messag
   expect(seen).toEqual(cmds)
 })
 
+test('warn mode: nothing is refused; the agent is told what would have been stopped', { options: { mode: 'warn' } }, async ($, on) => {
+  host(on, args => (has(args, 'log') ? { out: pushLog('abc1234', 'cfg.ts', `k='${AWS}'`) } : branches('main', 'main')(args)))
+  const seen = shell(on)
+  const force = await $.tool.call({ tool: 'Bash', command: 'git push -f origin main' })
+  expect(force.deny).toBeUndefined()
+  expect((force.context ?? []).join('\n')).toContain('warn mode')
+  expect((force.context ?? []).join('\n')).toContain('protected branch')
+  const key = await $.tool.call({ tool: 'Bash', command: 'git push origin feature' })
+  expect(key.deny).toBeUndefined()
+  expect((key.context ?? []).join('\n')).toContain('AWS access key ID')
+  const plain = await $.tool.call({ tool: 'Bash', command: 'git status' })
+  expect(plain.context ?? []).toEqual([])
+  expect(seen).toEqual(['git push -f origin main', 'git push origin feature', 'git status'])
+  expect(await $.command.run(typed(''))).toMatchObject({ text: expect.stringContaining('Mode: warn') })
+})
+
 test('S5 PowerShell: an env change before an unknown git name is refused', async ($, on) => {
   host(on, args => (has(args, 'config', '--get') ? { code: 1 } : undefined))
   const seen = shell(on)

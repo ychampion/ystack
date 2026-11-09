@@ -103,6 +103,9 @@ export const DEFAULT_KEYWORDS: Record<Tier, string[]> = {
   ],
 }
 
+/** Words that mark plain review or verification work; the `reviewTier` setting decides their tier. */
+export const REVIEW_WORDS = ['verif*', 'review*', 'audit*']
+
 /**
  * Always the high tier, whatever else the task says (a lookup, a build, a fix round): security work,
  * crashes, races, flaky tests, and bugs whose cause is not known. Not a setting.
@@ -246,11 +249,11 @@ export function decide(req: Request, c: Classified, cfg: Config): Decision {
     effort = cfg.mediumEffort
   } else if (tier === 'fast') model = fast
   const why = c.tier ? `${tier}: ${c.why}` : tier ? `${tier}: no rule matched, unmatched tasks get medium` : 'no rule matched; left as asked'
+  if (named) {
+    // An agent type outside genericTypes: its definition's model and effort stand, enforce or not.
+    return { ...(replacement ? { model: replacement } : {}), ...(tier ? { tier } : {}), why: `${req.subagentType} isn't a routed type; kept${banned ? ', banned model replaced' : ''}`, ...(note ? { note } : {}) }
+  }
   if (!cfg.enforce) {
-    if (named) {
-      // The caller picked an agent type: its definition's model and effort stand.
-      return { ...(replacement ? { model: replacement } : {}), ...(tier ? { tier } : {}), why: `${req.subagentType} chosen by the caller; kept${banned ? ', banned model replaced' : ''}`, ...(note ? { note } : {}) }
-    }
     if (req.model && !banned) model = undefined
     if (req.effort) effort = undefined
   }

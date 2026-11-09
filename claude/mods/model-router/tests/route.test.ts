@@ -73,7 +73,9 @@ test('decisions: the table, a banned model, explicit choices, enforce, named age
   const named = decide(req({ subagentType: 'my-reviewer' }), { tier: 'fast', why: '' }, CFG)
   expect(named.model).toBeUndefined()
   expect(named.effort).toBeUndefined()
-  expect(decide(req({ subagentType: 'my-reviewer' }), { tier: 'fast', why: '' }, { ...CFG, enforce: true }).model).toBe('haiku')
+  // enforce covers the routed types only: another agent type keeps its own model and effort.
+  expect(decide(req({ subagentType: 'my-reviewer' }), { tier: 'fast', why: '' }, { ...CFG, enforce: true }).model).toBeUndefined()
+  expect(decide(req({ subagentType: 'my-reviewer', effort: 'max' }), { tier: 'fast', why: '' }, { ...CFG, enforce: true, genericTypes: ['general-purpose', 'my-reviewer'] }).model).toBe('haiku')
   expect(decide(req({ subagentType: 'my-reviewer', model: 'sonnet' }), { tier: 'fast', why: '' }, { ...CFG, bannedModels: ['sonnet'] }).model).toBe('opus')
 
   expect(decide(req({ fork: true, model: 'sonnet' }), { tier: 'high', why: '' }, { ...CFG, bannedModels: ['sonnet'] })).toEqual({ why: 'a fork always runs on its parent model' })

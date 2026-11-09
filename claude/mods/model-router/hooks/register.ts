@@ -1,6 +1,6 @@
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
-import { DEFAULT_KEYWORDS, EFFORTS, classify, decide, type Classified, type Config, type Decision, type Effort, type Request, type Tier } from './route.ts'
+import { DEFAULT_KEYWORDS, EFFORTS, REVIEW_WORDS, classify, decide, type Classified, type Config, type Decision, type Effort, type Request, type Tier } from './route.ts'
 
 function list(v: unknown, d = ''): string[] {
   const raw = Array.isArray(v) ? v.join(',') : typeof v === 'string' ? v : d
@@ -14,14 +14,17 @@ const effortOf = (v: unknown, d: Effort): Effort => ((EFFORTS as readonly unknow
 const str = (v: unknown, d: string) => (typeof v === 'string' && v.trim() ? v.trim() : d)
 
 function configFrom(o: PluginOptions): Config {
+  // reviewTier medium: plain reviews and verification go to medium; security, parsers, concurrency, debugging
+  // and edge cases keep their own high keywords, which are checked first.
+  const reviewMedium = o.reviewTier === 'medium'
   return {
     strongModel: str(o.strongModel, ''),
     fastModel: str(o.fastModel, 'haiku'),
     highEffort: effortOf(o.highEffort, 'high'),
     mediumEffort: effortOf(o.mediumEffort, 'medium'),
     keywords: {
-      high: [...DEFAULT_KEYWORDS.high, ...list(o.highKeywords)],
-      medium: [...DEFAULT_KEYWORDS.medium, ...list(o.mediumKeywords)],
+      high: [...DEFAULT_KEYWORDS.high.filter(k => !(reviewMedium && REVIEW_WORDS.includes(k))), ...list(o.highKeywords)],
+      medium: [...DEFAULT_KEYWORDS.medium, ...(reviewMedium ? REVIEW_WORDS : []), ...list(o.mediumKeywords)],
       fast: [...DEFAULT_KEYWORDS.fast, ...list(o.fastKeywords)],
     },
     unmatched: o.unmatched === 'leave' ? 'leave' : 'medium',

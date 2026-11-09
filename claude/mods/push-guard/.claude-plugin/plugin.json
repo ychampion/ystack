@@ -1,11 +1,21 @@
 {
   "name": "push-guard",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "description": "Stops the git and GitHub accidents that are hard to undo, in the main session and every subagent: keys in a commit or push, making a repo public, force-pushing to a protected branch, and deleting remote branches or repos. It says why and how to go on safely.",
   "author": {
     "name": "ychampion"
   },
   "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "block: risky commands are refused. warn: nothing is refused; after the command runs, Claude is told what push-guard would have stopped.",
+      "options": [
+        "block",
+        "warn"
+      ],
+      "default": "block"
+    },
     "protectedBranches": {
       "type": "string",
       "title": "Protected branches",

@@ -28,7 +28,7 @@ autoCompactWindow: 250000
 ---
 ```
 
-`opus-high` is the same with `effort: high`, for verification and review, security, bugs whose cause is unknown, concurrency, parsers and numeric code.
+`opus-high` is the same with `effort: high`, for security, bugs whose cause is unknown, concurrency, parsers and numeric code, and for reviews of that kind of code. Ordinary reviews run at medium (section 3).
 
 Subagents made **73%** of all usage in the logs. A long subagent run has nobody to type `/clear`, so compaction is its only reset. Replaying those runs with compaction at 250k instead of 400k:
 
@@ -41,11 +41,13 @@ The window setting only ever lowers the point where compaction starts. It never 
 
 ## 3. Effort comes from the agent file, not from hope
 
-The Agent tool has no effort parameter. A subagent takes `effort:` from its agent file's frontmatter. If the file has none, it inherits the main session's level. That's why the two files above exist: dispatching `opus-medium` or `opus-high` is how you choose effort per task.
+A subagent takes `effort:` from its agent file's frontmatter. If the file has none, it inherits the main session's level. That's why the two files above exist: dispatching `opus-medium` or `opus-high` is how you choose effort per task. The Agent tool's own `effort` input, when a call sets it, wins over the file (checked by logging a call: an `opus-high` dispatch with `effort: medium` ran at medium).
 
-**Medium is the default** for building. In one day of logs, 40 of 52 subagents ran at high, mostly builds and fix rounds, and high made 59% of all usage. Moving those to medium is where effort saves. Keep high for the work where mistakes hide in edge cases: reviews, security, unknown bugs.
+**Medium is the default** for building. In one day of logs, 40 of 52 subagents ran at high, mostly builds and fix rounds, and high made 59% of all usage. Moving those to medium is where effort saves. Keep high for the work where mistakes hide in edge cases: security, unknown bugs, concurrency, parsers.
 
-The [`model-router`](../mods/model-router) mod enforces this at dispatch.
+**Most reviews can run at medium too.** A 30-day study of 770 subagents found 56% of high-effort spend went to builds, fix rounds and known-cause fixes, with the same redo rate at either tier. In a blind test, two fresh reviewers got the same code and brief. The medium one caught 3 of 5 known bugs and wrote a full report in 12 minutes. The high one caught 2 of 5 in 24 minutes, though it went deeper on parser edge cases. That's one test, not proof, but it is why reviews of security, parser and concurrency code stay at high and the rest move to medium.
+
+The [`model-router`](../mods/model-router) mod enforces this at dispatch: `reviewTier: medium` for plain reviews, and `enforce` with your agent types in `genericTypes` so a build sent to `opus-high` still runs at medium.
 
 ## 4. The small model compacts at 100k
 

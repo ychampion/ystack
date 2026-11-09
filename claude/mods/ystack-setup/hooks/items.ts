@@ -85,13 +85,13 @@ export const AGENTS: Record<string, { effort: string; description: string; body:
   'opus-medium': {
     effort: 'medium',
     description:
-      'Default builder for delegated work (Opus at medium effort). Use for features, whole products from a spec, multi-file changes, refactors, tests, research, docs, fix rounds from a review, and bugs whose cause is known.',
+      'Default builder for delegated work (Opus at medium effort). Use for features, whole products from a spec, multi-file changes, refactors, tests, research, docs, fix rounds from a review, bugs whose cause is known, and ordinary code reviews.',
     body: 'You are a capable engineering agent working from a brief. Do the whole task at the scope asked. Read code before changing it. Verify with a real check (build, test or run) before you report. End your report with a section "Assumptions I made".',
   },
   'opus-high': {
     effort: 'high',
     description:
-      'Verification and edge-case agent (Opus at high effort). Use for every verification or review pass, security, bugs whose cause is unknown, concurrency, storage and low-level code, parsers, and a retry after opus-medium under-delivered.',
+      'Verification and edge-case agent (Opus at high effort). Use for security, bugs whose cause is unknown, concurrency, storage and low-level code, parsers, reviews of that kind of code, and a retry after opus-medium under-delivered or a thin medium review.',
     body: 'You are a careful engineering agent for work where mistakes hide in edge cases. Reproduce a bug before fixing it, write a test that fails on the unfixed code, and check edge cases. Verify with a real check before you report. End your report with a section "Assumptions I made".',
   },
 }
@@ -144,7 +144,7 @@ const agentsItem: Item = {
   id: 'agents',
   title: 'Two subagent types that compact at 250k',
   what: () => 'agents/opus-medium.md (effort medium) and agents/opus-high.md (effort high), both model opus, autoCompactWindow 250000',
-  why: 'Medium is the default builder; high is for verification, review, security and bugs whose cause is unknown. Both compact long runs early.',
+  why: 'Medium is the default builder and reviewer; high is for security, concurrency, parsers and bugs whose cause is unknown. Both compact long runs early.',
   gain: `Measured on one heavy user's logs, not yours: replaying long subagent runs at 250k cut their context re-reads by 26%; compacting at 250k instead of 400k cut subagent usage ~14% over 14 days. Details: ${DOCS}`,
   kind: 'apply',
   status: c => {

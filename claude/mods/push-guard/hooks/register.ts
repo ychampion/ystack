@@ -4,7 +4,8 @@ import type { Shell } from './parse.ts'
 import { GH_CORE, actions, globMatch, hasPlaceholder, isDynamic, isExpanded, repoName, type Action, type Base, type CommitAction, type PushAction, type Scope } from './rules.ts'
 import { COMMIT_MARK, describe, scanDiff, scanFile, type Finding } from './secrets.ts'
 
-type Config = { allowPaths: string[]; protectedRepos: string[]; protectedBranches: string[] }
+/** `warn`: nothing is refused; the agent is told what push-guard would have stopped, after the command runs. */
+type Config = { allowPaths: string[]; protectedRepos: string[]; protectedBranches: string[]; mode: 'block' | 'warn' }
 
 function list(v: unknown, d: string): string[] {
   const raw = Array.isArray(v) ? v.join(',') : typeof v === 'string' ? v : d
@@ -19,6 +20,7 @@ function configFrom(o: PluginOptions): Config {
     allowPaths: list(o.allowPaths, ''),
     protectedRepos: list(o.protectedRepos, ''),
     protectedBranches: list(o.protectedBranches, 'main, master'),
+    mode: o.mode === 'warn' ? 'warn' : 'block',
   }
 }
 
@@ -396,6 +398,7 @@ async function check($: EngineInterface, w: Where, a: Action, cfg: Config, notes
 function statusText(cfg: Config): string {
   const lines = [
     'push-guard settings:',
+    `- Mode: ${cfg.mode === 'warn' ? 'warn (nothing is refused; Claude is told what would have been stopped)' : 'block'}`,
     `- Protected branches (no force-push): ${cfg.protectedBranches.join(', ') || 'none'}`,
     `- Protected repos (never made public by Claude): ${cfg.protectedRepos.join(', ') || 'none'}`,
     `- Paths skipped by the key scan: ${cfg.allowPaths.join(', ') || 'none'}`,
@@ -460,7 +463,10 @@ export const register: Register = (on, options) => {
       const placed = { ...a, base: locate(a.base, w) } as Action
       why.push(...(await check($, w, placed, cfg, notes)))
     }
-    if (why.length > 0) return { deny: `push-guard stopped this command.\n\n${[...new Set(why)].join('\n\n')}` }
+    if (why.length > 0 && cfg.mode === 'block') return { deny: `push-guard stopped this command.\n\n${[...new Set(why)].join('\n\n')}` }
+    if (why.length > 0) {
+      notes.unshift(`push-guard is in warn mode, so this command ran, but it would have stopped it. Check the result, and tell the user if any of this went wrong:\n\n${[...new Set(why)].join('\n\n')}`)
+    }
     const ran = await next(e)
     if (notes.length === 0 || ran.deny !== undefined) return ran
     return { ...ran, context: [...(ran.context ?? []), ...notes] }
@@ -468,6 +474,10 @@ export const register: Register = (on, options) => {
     if (next.called) return next(e)
     const command = e.command
     if (!RELEVANT.test(command)) return next(e)
+    if (cfg.mode === 'warn') {
+      const ran = await next(e)
+      return ran.deny !== undefined ? ran : { ...ran, context: [...(ran.context ?? []), "push-guard hit an internal error and couldn't check this command; it ran unchecked (warn mode)."] }
+    }
     // Fail closed: a command push-guard could not check does not run.
     return { deny: `push-guard hit an internal error and couldn't check this command, so it stopped it (${(next.error.message ?? next.error.kind).slice(0, 160)}). Tell the user; they can run it themselves, or turn push-guard off for it.` }
   })

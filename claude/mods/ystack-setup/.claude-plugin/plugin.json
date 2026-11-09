@@ -1,6 +1,6 @@
 {
   "name": "ystack-setup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "/ystack-setup lists recommended Claude Code settings (auto-compact windows, two subagent types, agent teams off, subagent model), shows which are already in place, and applies only the ones you tick when you press Apply, with backups and Undo. /ystack-setup check prints a text report.",
   "author": {
     "name": "ychampion"
