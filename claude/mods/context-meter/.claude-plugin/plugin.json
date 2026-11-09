@@ -1,6 +1,6 @@
 {
   "name": "context-meter",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Keeps long sessions cheap. /handoff writes a handoff in one turn and swaps the conversation in place for it (no /clear; background agents keep reporting). Hands off by itself between turns: after a push or merge on a big context, before the prompt cache lapses on an idle one, and when a session is running on its own. Speaks once at the handoff mark and near usage limits; /ctx shows size, limits and cost.",
   "author": {
     "name": "ychampion"

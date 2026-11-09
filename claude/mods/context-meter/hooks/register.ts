@@ -54,12 +54,12 @@ const CHECKPOINT = `[context-meter, not the user] Handoff checkpoint. Write the 
 # <project> handoff (<today's date>)
 ## Goal
 ## State (what is done, what is verified and how)
-## Running now (background agents, workflows, jobs, watchers: name or id, what each will report, how to check it)
+## Running now (background agents, workflows, jobs, watchers: name or id, its brief in one line (the task and what done means), what it will report, where it writes its output, how to check it)
 ## Waiting on the user (decisions, approvals, logins)
 ## Decisions and why
 ## Open questions (technical)
 ## Next steps (ordered, concrete)
-## Key files (paths with one line each)
+## Key files (paths with one line each, including scratchpad files, briefs and agent output files this session made)
 Be specific: real paths, commands, branch names, PR numbers, agent ids. Under 120 lines.`
 
 /** The handoff, when a turn's answer is one: it starts with the title and has the checkpoint's own sections. */

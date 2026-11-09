@@ -287,3 +287,13 @@ test('handoffDir decides where the file goes', { options: { handoffDir: '~/notes
   await $.turn.complete(done(DOC))
   expect(seen.writes[0]?.path.replaceAll('\\', '/').endsWith('/home/me/notes/handoffs/work-handoff.md')).toBe(true)
 })
+
+test('the checkpoint asks for what an orchestrator needs to judge reports after the swap: briefs, output paths, scratchpad files', async ($, on) => {
+  const { clock, seen } = await setup($, on)
+  await $.command.run({ command: 'handoff' } as never)
+  await clock.settle()
+  const p = seen.prompts.find(x => x.includes('Handoff checkpoint')) ?? ''
+  expect(p).toContain('its brief in one line')
+  expect(p).toContain('where it writes its output')
+  expect(p).toContain('scratchpad files')
+})
