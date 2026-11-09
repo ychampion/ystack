@@ -17,6 +17,8 @@ In the desktop app's Code tab: + next to the prompt box → Plugins → Add mark
 
 Measured write-ups behind the mods are in [docs/](docs/).
 
+Also in this folder: [`agents/`](agents/) holds the `opus-medium`, `opus-high` and `haiku-max` subagent types (`./setup --agents` installs them; the opus ones are the same files `ystack-setup` writes, and a test keeps them identical), and [`CLAUDE.starter.md`](CLAUDE.starter.md) is a starter `CLAUDE.md` whose rules each name the mod that enforces them.
+
 ## Guards
 
 | Mod | What it does | Settings |

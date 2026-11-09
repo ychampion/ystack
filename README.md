@@ -18,11 +18,50 @@ The numbers below come from one heavy user's own logs: 14 days of Claude Code on
 
 | Folder | For | Status |
 | --- | --- | --- |
-| [`claude/`](claude/) | Claude Code | 32 mods, plus measured write-ups in [`claude/docs/`](claude/docs/) |
-| [`skills/`](skills/) | Claude Code, Codex, OpenCode and other agents that read skills | `taste` (design judgment), `make-media` (images and video when code isn't enough) |
+| [`claude/`](claude/) | Claude Code | 32 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
+| [`skills/`](skills/) | Claude Code, Codex, OpenCode and other agents that read skills | 16 skills: design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
+| [`codex/`](codex/) | Codex CLI | A brief template for unattended `codex exec` runs; pairs with the `codex-ladder` mod |
 | [`ops/`](ops/) | Any Linux server | `security-sweep`: a weekly scan of OS packages, repos and containers that installs only restart-free security patches and reports the rest |
 
-## Install a Claude Code mod
+## How ystack differs
+
+Most agent stacks are skills: written advice the model reads and may or may not follow. ystack has skills too, but the core is different:
+
+- **Enforced, not requested.** The mods are hooks on tool calls, prompts and subagent turns. A rule like "no done without a real check" or "no key in a pushed commit" runs as code every time, whether or not the model remembered it.
+- **Measured, not guessed.** Every number on this page comes from real logs, and `/ystack-stats` replays your own last two weeks under ystack's rules before you change anything.
+- **One stack for several agents.** The same skills install for Claude Code, Codex and OpenCode; Codex runs get a brief template and an effort ladder.
+- **The human stays in charge, not in the way.** Decisions that are yours go to an inbox while the agent carries on with its recommended default; guards stop the irreversible mistakes; setup never overwrites anything of yours.
+
+## Install
+
+Clone it once and run setup. It installs every skill in `skills/` for each agent you have (Claude Code, Codex, OpenCode), and re-running it updates them.
+
+```bash
+git clone https://github.com/ychampion/ystack.git ~/ystack && ~/ystack/setup
+```
+
+On macOS and Linux the skills are symlinks into the checkout, so `git pull` updates them. On Windows (Git Bash) they are copies: re-run `./setup` after each pull, or use `/ystack-upgrade`.
+
+| Flag | Does |
+| --- | --- |
+| `--host claude,codex,opencode` | Pick hosts (default: every host whose home folder exists; `all` for all three) |
+| `--agents` | Also install the `opus-medium`, `opus-high` and `haiku-max` subagent types into `~/.claude/agents` |
+| `--mods` | Print the commands that add the marketplace and a starter set of mods; add `--yes` to run them |
+| `--dry-run` | Show what would change, change nothing |
+| `--uninstall` | Remove only what ystack installed |
+
+Setup never overwrites a skill or agent file that is yours: it skips it and says so. `--force` replaces it after moving yours to `~/.ystack-backup/`.
+
+The starter mods are `ystack-stats`, `ystack-setup`, `context-meter`, `verify`, `push-guard` and `model-router`. Then:
+
+- `/ystack-stats` replays your last two weeks under ystack's rules, so you see the savings on your own logs.
+- `/ystack-setup` walks through the recommended Claude Code settings; nothing changes until you Apply.
+- Copy or merge [`claude/CLAUDE.starter.md`](claude/CLAUDE.starter.md) into `~/.claude/CLAUDE.md`. It holds the working rules and names the mod that enforces each one. Setup doesn't install it.
+- Codex users: start each `codex exec` brief from [`codex/briefs/brief-template.md`](codex/briefs/brief-template.md).
+
+Later, `/ystack-upgrade` pulls, re-runs setup for the same hosts and updates installed mods.
+
+## Install one Claude Code mod
 
 At the prompt of a Claude Code terminal session:
 
