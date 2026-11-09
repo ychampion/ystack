@@ -1,6 +1,6 @@
 {
   "name": "push-guard",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Stops the git and GitHub accidents that are hard to undo, in the main session and every subagent: keys in a commit or push, making a repo public, force-pushing to a protected branch, and deleting remote branches or repos. It says why and how to go on safely.",
   "author": {
     "name": "ychampion"

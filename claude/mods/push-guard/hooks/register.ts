@@ -259,6 +259,34 @@ async function check($: EngineInterface, w: Where, a: Action, cfg: Config, notes
       }
       break
     }
+    case 'gh-alias': {
+      const r = await run($, ['gh', 'alias', 'list'], a.base.cwd)
+      // No aliases at all: gh says so (exit 0 or 1, depending on version).
+      if (!r.ok && !/no aliases/i.test(r.err)) {
+        why.push(`push-guard couldn't look up whether \`gh ${a.sub}\` is an alias (${r.err || 'gh alias list failed'}). Run the command it stands for directly.`)
+        break
+      }
+      const line = r.out.split(/\r?\n/).map(l => /^\s*([^:\s]+):\s*(.*)$/.exec(l)).find(m => m?.[1] === a.sub)
+      // Not an alias: an extension (`gh dash`) or a typo.
+      if (!line) break
+      let expansion = (line[2] ?? '').trim().replace(/^(['"])(.*)\1$/, '$2')
+      if (expansion.startsWith('!') || depth >= 3) {
+        why.push(`\`gh ${a.sub}\` is a gh alias for \`${expansion.slice(0, 80)}\`. Run the command it stands for directly, so push-guard can check it.`)
+        break
+      }
+      // gh fills $1, $2... from the arguments and appends the rest.
+      const used = new Set<number>()
+      expansion = expansion.replace(/\$(\d+)/g, (_m, n: string) => {
+        const i = Number(n) - 1
+        used.add(i)
+        return a.rest[i] !== undefined ? quote(a.rest[i] as string) : ''
+      })
+      const extra = a.rest.filter((_x, i) => !used.has(i))
+      for (const inner of actions(`gh ${expansion} ${extra.map(quote).join(' ')}`, 'bash')) {
+        why.push(...(await check($, w, { ...inner, base: a.base } as Action, cfg, notes, depth + 1)))
+      }
+      break
+    }
     case 'commit': {
       if (a.base.cwdUnknown) {
         why.push(UNKNOWN_REPO)

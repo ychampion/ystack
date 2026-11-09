@@ -296,3 +296,36 @@ test('S2 a git config alias is checked as what it stands for; shell aliases are 
   expect(calls.length).toBe(before)
   expect(seen).toEqual(['git lg -5', 'git frobnicate', 'git log --oneline {a,b}', 'echo git push -f origin main'])
 })
+
+// Repros from the second security review: config set in the same command, case, launchers, gh aliases.
+
+test('S3 an alias the same command sets up, PUSH in caps, launchers of anything risky, and commands git runs for you are refused', async ($, on) => {
+  host(on, args => (has(args, 'config', '--get') ? { code: 1 } : branches('main', 'main')(args)))
+  const seen = shell(on)
+  for (const cmd of [
+    'git config alias.zz push && git zz -f origin main',
+    'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.zz GIT_CONFIG_VALUE_0=push git zz -f origin main',
+    'export HOME=/tmp/h; git zz -f origin main',
+    'git PUSH -f origin main',
+    'git Push --force origin main',
+    'echo main | xargs git',
+    'find . -maxdepth 0 -exec git {} -f origin main \\;',
+    'xargs git -c alias.x=push x',
+    'git submodule foreach git push -f origin main',
+    'git rebase -x "git push -f origin main" main',
+    'gh alias set pub "repo edit --visibility public" && gh pub acme/x',
+  ]) expect([cmd, refusal(await $.tool.call({ tool: 'Bash', command: cmd })) ?? 'ran']).toEqual([cmd, expect.stringMatching(/push-guard/)])
+  expect(seen).toEqual([])
+})
+
+test('S4 gh aliases are checked as what they stand for; literal read-only launches still run', async ($, on) => {
+  host(on, args => (has(args, 'config', '--get') ? { code: 1 } : branches('feature', 'feature')(args)), args =>
+    args[0] === 'alias' && args[1] === 'list' ? 'co: pr checkout\npub: repo edit $1 --visibility public\n' : args[0] === 'repo' ? '{"nameWithOwner":"acme/x"}' : undefined,
+  )
+  const seen = shell(on)
+  expect(refusal(await $.tool.call({ tool: 'Bash', command: 'gh pub acme/x' }))).toContain('public')
+  await $.tool.call({ tool: 'Bash', command: 'gh co 12' })
+  await $.tool.call({ tool: 'Bash', command: 'ls | xargs -I{} git -C {} status --short' })
+  await $.tool.call({ tool: 'Bash', command: 'find . -name .git -execdir git log -1 \\;' })
+  expect(seen).toEqual(['gh co 12', 'ls | xargs -I{} git -C {} status --short', 'find . -name .git -execdir git log -1 \\;'])
+})
