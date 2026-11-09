@@ -380,6 +380,19 @@ test('S6 abbreviated long options, include.path, and env or wrappers before an a
   expect(seen).toEqual(['git push --force-w origin feature', 'git push --dry origin feature'])
 })
 
+test('S7 a git alias with shell syntax in its value is refused, not re-parsed', async ($, on) => {
+  host(on, args => {
+    if (has(args, 'config', '--get', 'alias.semi')) return { out: 'status; push -f origin main\n' }
+    if (has(args, 'config', '--get', 'alias.quo')) return { out: 'push "-f" origin main\n' }
+    if (has(args, 'config', '--get')) return { code: 1 }
+    return branches('feature', 'feature')(args)
+  })
+  const seen = shell(on)
+  expect(refusal(await $.tool.call({ tool: 'Bash', command: 'git semi' }))).toContain('is a git alias for')
+  expect(refusal(await $.tool.call({ tool: 'Bash', command: 'git quo' }))).toContain('is a git alias for')
+  expect(seen).toEqual([])
+})
+
 test('S5 PowerShell: an env change before an unknown git name is refused', async ($, on) => {
   host(on, args => (has(args, 'config', '--get') ? { code: 1 } : undefined))
   const seen = shell(on)

@@ -250,7 +250,8 @@ async function check($: EngineInterface, w: Where, a: Action, cfg: Config, notes
         break
       }
       const expansion = r.out.trim()
-      if (expansion.startsWith('!') || depth >= 3) {
+      // git splits an alias its own way, not like bash: only plain words are followed; anything a shell would read differently is refused.
+      if (expansion.startsWith('!') || depth >= 3 || /[\r\n\t;&|<>#`$(){}\\'"*?[\]~]/.test(expansion)) {
         why.push(`\`git ${a.sub}\` is a git alias for \`${expansion.slice(0, 80)}\`. Run the command it stands for directly, so push-guard can check it.`)
         break
       }
