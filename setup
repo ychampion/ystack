@@ -1,0 +1,806 @@
+#!/usr/bin/env bash
+# ystack setup: install ystack's skills for your agent hosts (Claude Code, Codex, OpenCode),
+# and on request its Claude Code subagent types and a starter set of mods.
+#
+# Works in bash 3.2 (macOS), bash on Linux, and Git Bash on Windows. Keep it that way:
+# no arrays, no associative arrays, no ${x,,}, no mapfile, no readlink -f.
+#
+# Ownership rule: setup only ever removes or replaces entries it can prove are ystack's:
+#   - a symlink that resolves into a ystack checkout's skills/<same name> folder, or
+#   - a copied folder holding the marker file `.ystack` (written by this script) whose skill= line
+#     matches the folder's name.
+# Anything else at a skill's path is the user's and is skipped, unless --force, which moves it
+# to ~/.ystack-backup/ first. A ystack copy whose files no longer match the sum= in its marker was
+# edited by the user: it is kept too (--force backs it up first). Agent files are tracked in
+# ~/.claude/agents/.ystack-manifest.
+#
+# Copies are staged in a temp sibling (.ystack-new-<name>.<pid>) and moved into place; old copies
+# are moved aside (.ystack-old-<name>.<pid>) before they are deleted. Any step that fails is
+# reported as FAILED, leaves that entry as it was, and makes setup exit 1.
+set -eu
+unset CDPATH
+
+YSTACK_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+MARKER=".ystack"
+AGENTS_SRC="$YSTACK_DIR/claude/agents"
+MARKETPLACE_REPO="ychampion/ystack"
+MARKETPLACE_NAME="ystack"
+
+# The starter mods `--mods` installs, and why each one is in the set:
+#   ystack-stats   shows, on day one, what the rest saves, replayed on your own logs
+#   ystack-setup   the settings checklist (compaction windows, subagent types); changes nothing until you Apply
+#   context-meter  the largest measured saving: hands off long sessions before they get expensive
+#   verify         no "done" without a real check; its live test runner stays off until you turn it on
+#   push-guard     stops the git mistakes you can't undo: keys pushed, a repo made public, force-push to main
+#   model-router   sends subagents to the opus-medium / opus-high / haiku-max types that --agents installs
+# Left out on purpose: mods that encode personal house rules (iron-rules) or need your own notes
+# or profile first (user-voice, operator-context). Install those by name when you want them.
+STARTER_MODS="ystack-stats ystack-setup context-meter verify push-guard model-router"
+
+usage() {
+  cat <<'EOF'
+Usage: ./setup [options]
+
+Installs every skill in skills/ for your agent hosts. Re-run it to update.
+
+  --host <list>   claude, codex, opencode, all, or auto (default: auto = every host
+                  whose home folder exists). Comma-separate or repeat for several.
+  --agents        Also install claude/agents/*.md into ~/.claude/agents (Claude Code only).
+  --mods          Print the commands that add the ystack marketplace and install a
+                  starter set of mods. With --yes, run them (needs the claude CLI).
+  --yes, -y       Run the --mods commands instead of printing them.
+  --force         Replace entries that are not ystack's, and ystack copies you
+                  edited (yours are moved to ~/.ystack-backup/<time>/ first).
+  --uninstall     Remove only what ystack installed, for the chosen hosts.
+  --dry-run, -n   Show what would change; change nothing.
+  -q, --quiet     Print only the summary and anything skipped.
+  -h, --help      This help.
+
+Skill folders:  Claude Code  ~/.claude/skills
+                Codex        ${CODEX_HOME:-~/.codex}/skills
+                OpenCode     ~/.config/opencode/skills
+macOS and Linux get symlinks into this checkout; Windows gets copies (re-run after git pull).
+EOF
+}
+
+die() { echo "setup: $*" >&2; exit 1; }
+
+HOSTS_ARG=""
+DO_AGENTS=0
+DO_MODS=0
+YES=0
+FORCE=0
+UNINSTALL=0
+DRY=0
+QUIET=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --host) [ $# -ge 2 ] || die "--host needs a value (claude, codex, opencode, all, auto)"; HOSTS_ARG="$HOSTS_ARG,$2"; shift 2 ;;
+    --host=*) HOSTS_ARG="$HOSTS_ARG,${1#--host=}"; shift ;;
+    --agents) DO_AGENTS=1; shift ;;
+    --mods) DO_MODS=1; shift ;;
+    --yes|-y) YES=1; shift ;;
+    --force) FORCE=1; shift ;;
+    --uninstall) UNINSTALL=1; shift ;;
+    --dry-run|-n) DRY=1; shift ;;
+    -q|--quiet) QUIET=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "setup: unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+say() { [ "$QUIET" -eq 1 ] || echo "$@"; }
+
+pretty() {
+  case "$1" in
+    "$HOME") echo "~" ;;
+    "$HOME"/*) echo "~${1#"$HOME"}" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# ---- hosts ----
+
+host_home() {
+  case "$1" in
+    claude) echo "$HOME/.claude" ;;
+    codex) echo "${CODEX_HOME:-$HOME/.codex}" ;;
+    opencode) echo "$HOME/.config/opencode" ;;
+  esac
+}
+host_label() {
+  case "$1" in
+    claude) echo "Claude Code" ;;
+    codex) echo "Codex" ;;
+    opencode) echo "OpenCode" ;;
+  esac
+}
+
+want_claude=0
+want_codex=0
+want_opencode=0
+add_auto() {
+  for h in claude codex opencode; do
+    if [ -d "$(host_home "$h")" ]; then eval "want_$h=1"; fi
+  done
+}
+list="${HOSTS_ARG#,}"
+[ -n "$list" ] || list="auto"
+old_ifs="$IFS"
+IFS=','
+for tok in $list; do
+  case "$tok" in
+    claude|codex|opencode) eval "want_$tok=1" ;;
+    all) want_claude=1; want_codex=1; want_opencode=1 ;;
+    auto) add_auto ;;
+    "") ;;
+    *) IFS="$old_ifs"; die "unknown host '$tok' (expected claude, codex, opencode, all or auto)" ;;
+  esac
+done
+IFS="$old_ifs"
+
+HOSTS=""
+for h in claude codex opencode; do
+  eval "w=\$want_$h"
+  if [ "$w" -eq 1 ]; then HOSTS="$HOSTS $h"; fi
+done
+HOSTS="${HOSTS# }"
+
+if [ -z "$HOSTS" ] && [ "$DO_MODS" -eq 0 ]; then
+  die "no agent host found (looked for ~/.claude, ${CODEX_HOME:-~/.codex}, ~/.config/opencode). Pass --host claude, codex or opencode to install anyway."
+fi
+
+# ---- link or copy ----
+
+IS_WINDOWS=0
+case "$(uname -s 2>/dev/null || echo unknown)" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=1 ;;
+esac
+# YSTACK_LINK_MODE=copy|link overrides the platform default (used by the tests).
+MODE="${YSTACK_LINK_MODE:-auto}"
+case "$MODE" in
+  auto) if [ "$IS_WINDOWS" -eq 1 ]; then MODE=copy; else MODE=link; fi ;;
+  copy|link) ;;
+  *) die "YSTACK_LINK_MODE must be copy, link or auto" ;;
+esac
+
+STAMP="$(date +%Y%m%d-%H%M%S)"
+BACKUP_ROOT="$HOME/.ystack-backup/$STAMP"
+
+# ---- failures ----
+
+FAILED=0          # failed steps across skills, agents and mods; any failure makes setup exit 1
+ERR=""            # the reason for the last failed step
+STAGED=""         # a temp entry this run created and has not moved into place yet
+n_fallback=0      # link mode: skills copied because a symlink could not be made
+FIRST_LN_ERR=""
+
+cleanup() { if [ -n "$STAGED" ]; then rm -rf "$STAGED" 2>/dev/null || true; fi; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# try CMD...: run it; on failure keep the first line of its output in ERR.
+try() {
+  if try_out="$("$@" 2>&1)"; then return 0; fi
+  ERR="$(printf '%s\n' "$try_out" | sed -n '1p')"
+  [ -n "$ERR" ] || ERR="$1 failed"
+  return 1
+}
+
+# is_checkout DIR: DIR is a ystack checkout (has this script and the ystack marketplace file).
+is_checkout() {
+  [ -f "$1/setup" ] && [ -f "$1/.claude-plugin/marketplace.json" ] &&
+    grep -q '"name": *"ystack"' "$1/.claude-plugin/marketplace.json" 2>/dev/null
+}
+
+marker_get() { sed -n "s/^$2=//p" "$1/$MARKER" 2>/dev/null | sed -n '1p'; } # DIR KEY
+
+# entry_kind PATH -> none | link | copy | foreign
+entry_kind() {
+  e="$1"; en="$(basename "$e")"
+  if [ -L "$e" ]; then
+    raw="$(readlink "$e" 2>/dev/null || true)"; raw="${raw%/}"
+    case "$raw" in "$YSTACK_DIR/skills/$en") echo link; return ;; esac
+    t="$(cd -P "$e" 2>/dev/null && pwd -P)" || { echo foreign; return; }
+    if [ "$(basename "$t")" != "$en" ]; then echo foreign; return; fi
+    case "$t" in "$YSTACK_DIR/skills/$en") echo link; return ;; esac
+    if [ "$(basename "$(dirname "$t")")" = skills ] && is_checkout "$(dirname "$(dirname "$t")")"; then echo link; else echo foreign; fi
+  elif [ -d "$e" ] && [ -f "$e/$MARKER" ] && [ "$(marker_get "$e" skill)" = "$en" ]; then
+    echo copy
+  elif [ -e "$e" ]; then
+    echo foreign
+  else
+    echo none
+  fi
+}
+
+# from_this_checkout PATH KIND: the ystack entry came from this checkout.
+from_this_checkout() {
+  en="$(basename "$1")"
+  if [ "$2" = link ]; then
+    ftc_raw="$(readlink "$1" 2>/dev/null || true)"
+    [ "${ftc_raw%/}" != "$YSTACK_DIR/skills/$en" ] || return 0
+    t="$(cd -P "$1" 2>/dev/null && pwd -P)" || return 1
+    [ "$t" = "$YSTACK_DIR/skills/$en" ]
+    return
+  fi
+  [ "$(marker_get "$1" source)" = "$YSTACK_DIR" ]
+}
+
+# tree_hash DIR -> one fingerprint of every file under DIR except the marker; non-zero if any
+# file can't be listed or read.
+tree_hash() {
+  th_list="$(cd "$1" && find . -type f ! -name "$MARKER")" || return 1
+  th_sums="$(cd "$1" && printf '%s\n' "$th_list" | LC_ALL=C sort | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    cksum "$f" || exit 1
+  done)" || return 1
+  printf '%s\n' "$th_sums" | cksum | awk '{print $1"-"$2}'
+}
+
+write_marker() { # DIR NAME SUM
+  printf '%s\n' "# Installed by ystack setup. If you edit files here, setup keeps your version (sum= no longer matches)." \
+    "# Delete this file to make the folder fully yours; setup will then leave it alone." \
+    "source=$YSTACK_DIR" "skill=$2" "sum=$3" >"$1/$MARKER"
+}
+
+# copy_state DIR: sets COPY_STATE to clean | edited | unknown (an older marker without sum=)
+# and CUR_SUM to the folder's current fingerprint. Non-zero if the folder can't be read.
+copy_state() {
+  CUR_SUM="$(tree_hash "$1")" || { ERR="could not read every file in $(pretty "$1")"; return 1; }
+  cs_rec="$(marker_get "$1" sum)"
+  if [ -z "$cs_rec" ]; then COPY_STATE=unknown
+  elif [ "$cs_rec" = "$CUR_SUM" ]; then COPY_STATE=clean
+  else COPY_STATE=edited; fi
+}
+
+# delete_tree DIR: delete it with the marker last, so a partial delete still carries the marker.
+delete_tree() {
+  try find "$1" -mindepth 1 ! -path "$1/$MARKER" -delete && try rm -rf "$1"
+}
+
+# retire_entry PATH KIND: remove a ystack entry. A copy is moved aside first, so a failed delete
+# never leaves a half folder at the skill's own path.
+retire_entry() {
+  if [ "$2" = link ]; then try rm -f "$1"; return; fi
+  re_aside="$(dirname "$1")/.ystack-old-$(basename "$1").$$"
+  try mv "$1" "$re_aside" || return 1
+  delete_tree "$re_aside" ||
+    { ERR="moved aside to $(pretty "$re_aside") but could not delete it ($ERR); the next run retries"; return 1; }
+}
+
+# backup_entry PATH LABEL: move PATH into the backup folder; sets BACKUP_PATH. Non-zero, with PATH
+# left where it was, if anything fails.
+backup_entry() {
+  BACKUP_PATH="$BACKUP_ROOT/$2"
+  if [ -e "$BACKUP_PATH" ] || [ -L "$BACKUP_PATH" ]; then BACKUP_PATH="$BACKUP_PATH.$$"; fi
+  try mkdir -p "$(dirname "$BACKUP_PATH")" || return 1
+  try mv "$1" "$BACKUP_PATH" || return 1
+  if [ -e "$1" ] || [ -L "$1" ]; then ERR="$(pretty "$1") is still there after the move"; return 1; fi
+}
+
+discard_stage() { if [ -n "$STAGED" ]; then rm -rf "$STAGED" 2>/dev/null || true; fi; STAGED=""; }
+
+# stage_entry SRC PARENT NAME: build the new entry under a temp name next to where it goes.
+# Sets STAGED and USED (link | copy). Non-zero (nothing left behind) on failure.
+stage_entry() {
+  se_tmp="$2/.ystack-new-$3.$$"
+  if [ -e "$se_tmp" ] || [ -L "$se_tmp" ]; then ERR="$(pretty "$se_tmp") already exists"; return 1; fi
+  if [ "$MODE" = link ]; then
+    STAGED="$se_tmp"
+    if se_lnerr="$(ln -s "$1" "$se_tmp" 2>&1)" && [ -L "$se_tmp" ]; then USED=link; return 0; fi
+    # No symlink (ln failed, or made a copy because symlinks aren't available): copy instead.
+    [ -n "$se_lnerr" ] || se_lnerr="ln -s made a copy, not a symlink (symlinks are not available here)"
+    n_fallback=$((n_fallback + 1))
+    [ -n "$FIRST_LN_ERR" ] || FIRST_LN_ERR="$(printf '%s\n' "$se_lnerr" | sed -n '1p')"
+    discard_stage
+    if [ -e "$se_tmp" ] || [ -L "$se_tmp" ]; then ERR="could not remove $(pretty "$se_tmp")"; return 1; fi
+  fi
+  try mkdir "$se_tmp" || return 1
+  STAGED="$se_tmp"
+  try write_marker "$se_tmp" "$3" "" || { discard_stage; return 1; }
+  try cp -R "$1"/. "$se_tmp"/ || { ERR="copy failed: $ERR"; discard_stage; return 1; }
+  se_sum="$(tree_hash "$se_tmp")" || { ERR="could not read the new copy"; discard_stage; return 1; }
+  try write_marker "$se_tmp" "$3" "$se_sum" || { discard_stage; return 1; }
+  USED=copy
+}
+
+# resolve_path PATH -> its real path; trailing parts that don't exist yet are kept as written.
+resolve_path() {
+  rp_d="$1"; rp_rest=""
+  while [ ! -d "$rp_d" ]; do rp_rest="/$(basename "$rp_d")$rp_rest"; rp_d="$(dirname "$rp_d")"; done
+  printf '%s%s\n' "$(cd -P "$rp_d" && pwd -P)" "$rp_rest"
+}
+
+# ---- per-host counters and summary ----
+
+SUMMARY=""
+add_summary() { SUMMARY="$SUMMARY$1
+"; }
+reset_counts() { n_inst=0; n_upd=0; n_same=0; n_skip=0; n_rem=0; n_fail=0; skips=""; fails=""; }
+note_skip() { n_skip=$((n_skip + 1)); skips="$skips    skipped $1
+"; }
+note_fail() { # NAME REASON
+  FAILED=$((FAILED + 1)); n_fail=$((n_fail + 1))
+  fails="$fails    $1: FAILED ($2)
+"
+  say "  $1: FAILED ($2)"
+}
+verb() { if [ "$DRY" -eq 1 ]; then echo "would $1"; else echo "$2"; fi; }
+
+# ---- skills ----
+
+SKILL_NAMES=""
+for f in "$YSTACK_DIR"/skills/*/SKILL.md; do
+  [ -f "$f" ] || continue
+  SKILL_NAMES="$SKILL_NAMES $(basename "$(dirname "$f")")"
+done
+SKILL_NAMES="${SKILL_NAMES# }"
+
+install_skill() { # HOST TARGET NAME
+  host="$1"; target="$2"; name="$3"
+  src="$YSTACK_DIR/skills/$name"
+  dst="$target/$name"
+  if [ -e "$dst" ]; then
+    is_rd="$(cd -P "$dst" 2>/dev/null && pwd -P || true)"
+    if [ "$is_rd" = "$YSTACK_DIR" ] || { [ ! -L "$dst" ] && [ "$is_rd" = "$src" ]; }; then
+      note_skip "$name: $(pretty "$dst") is this checkout's own folder"
+      return
+    fi
+  fi
+  kind="$(entry_kind "$dst")"
+  how=none # how the old entry is cleared: none | remove | backup
+  case "$kind" in
+    none) action=install ;;
+    link)
+      if [ "$MODE" = link ] && [ "$(cd -P "$dst" 2>/dev/null && pwd -P)" = "$src" ]; then
+        n_same=$((n_same + 1)); say "  $name: up to date"; return
+      fi
+      action=update; how=remove ;;
+    copy)
+      copy_state "$dst" || { note_fail "$name" "$ERR"; return; }
+      if [ "$MODE" = copy ]; then
+        is_want="$(tree_hash "$src")" || { note_fail "$name" "could not read every file in $(pretty "$src")"; return; }
+        if [ "$CUR_SUM" = "$is_want" ]; then
+          # An older marker without sum=: record it now that the copy is known to match.
+          if [ "$COPY_STATE" = unknown ] && [ "$DRY" -eq 0 ]; then
+            try write_marker "$dst" "$name" "$CUR_SUM" || { note_fail "$name" "could not update its marker: $ERR"; return; }
+          fi
+          n_same=$((n_same + 1)); say "  $name: up to date"; return
+        fi
+      fi
+      case "$COPY_STATE" in
+        clean) action=update; how=remove ;;
+        unknown) action=update; how=backup ;; # can't tell whether it was edited, so keep the old copy
+        edited)
+          if [ "$FORCE" -eq 0 ]; then
+            note_skip "$name: $(pretty "$dst") was edited since ystack installed it; kept yours (re-run with --force to replace it; yours is backed up first)"
+            say "  $name: edited, kept yours"
+            return
+          fi
+          action=replace; how=backup ;;
+      esac ;;
+    foreign)
+      if [ "$FORCE" -eq 0 ]; then
+        note_skip "$name: $(pretty "$dst") exists and is not ystack's (keep it, or re-run with --force to replace it)"
+        say "  $name: skipped (yours)"
+        return
+      fi
+      action=replace; how=backup ;;
+  esac
+  if [ "$DRY" -eq 1 ]; then
+    case "$action" in
+      install) n_inst=$((n_inst + 1)); say "  $name: would install ($MODE)" ;;
+      update) n_upd=$((n_upd + 1)); say "  $name: would update ($MODE)" ;;
+      replace) n_upd=$((n_upd + 1)); say "  $name: would replace yours (--force; yours would be backed up)" ;;
+    esac
+    return
+  fi
+  try mkdir -p "$target" || { note_fail "$name" "could not create $(pretty "$target"): $ERR"; return; }
+  stage_entry "$src" "$target" "$name" || { note_fail "$name" "$ERR; left $(pretty "$dst") as it was"; return; }
+  # Clear the old entry. On any failure, drop the staged entry and leave the old one in place.
+  aside=""; backup=""
+  case "$how" in
+    remove)
+      if [ "$kind" = link ]; then
+        try rm -f "$dst" || { discard_stage; note_fail "$name" "could not remove the old link: $ERR"; return; }
+      else
+        aside="$target/.ystack-old-$name.$$"
+        try mv "$dst" "$aside" || { discard_stage; note_fail "$name" "could not move the old copy aside: $ERR; left it as it was"; return; }
+      fi ;;
+    backup)
+      backup_entry "$dst" "$host/$name" ||
+        { discard_stage; note_fail "$name" "could not back up $(pretty "$dst"): $ERR; left it untouched"; return; }
+      backup="$BACKUP_PATH" ;;
+  esac
+  if [ -e "$dst" ] || [ -L "$dst" ]; then
+    discard_stage; note_fail "$name" "$(pretty "$dst") is still there; nothing replaced"; return
+  fi
+  if ! try mv "$STAGED" "$dst"; then
+    is_err="$ERR"; discard_stage
+    if [ -n "$aside" ]; then mv "$aside" "$dst" 2>/dev/null || true; fi
+    if [ -n "$backup" ]; then mv "$backup" "$dst" 2>/dev/null || true; fi
+    note_fail "$name" "could not move the new entry into place: $is_err"
+    return
+  fi
+  STAGED=""
+  if [ -n "$aside" ]; then
+    delete_tree "$aside" || note_fail "$name" "updated, but the old copy at $(pretty "$aside") could not be deleted ($ERR); the next run retries"
+  fi
+  case "$action" in
+    install) n_inst=$((n_inst + 1)); say "  $name: installed ($USED)" ;;
+    update)
+      n_upd=$((n_upd + 1))
+      if [ -n "$backup" ]; then say "  $name: updated ($USED); the old copy is in $(pretty "$backup")"
+      else say "  $name: updated ($USED)"; fi ;;
+    replace) n_upd=$((n_upd + 1)); say "  $name: replaced yours (--force); yours is in $(pretty "$backup")" ;;
+  esac
+}
+
+# retire_owned PATH KIND NAME NOTE: remove a ystack entry for prune or uninstall. Edited copies are
+# kept (--force backs them up and removes them); copies with an older marker are backed up.
+retire_owned() {
+  ro_how=remove
+  if [ "$2" = copy ]; then
+    copy_state "$1" || { note_fail "$3" "$ERR"; return; }
+    case "$COPY_STATE" in
+      edited)
+        if [ "$FORCE" -eq 0 ]; then
+          note_skip "$3: $(pretty "$1") was edited since ystack installed it; kept yours (--force backs it up and removes it)"
+          say "  $3: edited, kept yours"
+          return
+        fi
+        ro_how=backup ;;
+      unknown) ro_how=backup ;;
+    esac
+  fi
+  if [ "$DRY" -eq 1 ]; then n_rem=$((n_rem + 1)); say "  $3: would remove$4"; return; fi
+  if [ "$ro_how" = backup ]; then
+    backup_entry "$1" "$cur_host/$3" || { note_fail "$3" "could not back up $(pretty "$1"): $ERR; left it in place"; return; }
+    n_rem=$((n_rem + 1)); say "  $3: removed$4; a copy is in $(pretty "$BACKUP_PATH")"
+  else
+    retire_entry "$1" "$2" || { note_fail "$3" "could not remove it: $ERR"; return; }
+    n_rem=$((n_rem + 1)); say "  $3: removed$4"
+  fi
+}
+
+# clean_leftovers TARGET: temp entries an interrupted run left behind. Removed only when they
+# carry this checkout's marker (or are a staged link into it); anything else is reported.
+clean_leftovers() {
+  for lo in "$1"/.ystack-new-* "$1"/.ystack-old-*; do
+    [ -e "$lo" ] || [ -L "$lo" ] || continue
+    lo_n="$(basename "$lo")"
+    if [ -L "$lo" ]; then
+      case "$(readlink "$lo" 2>/dev/null || true)" in "$YSTACK_DIR"/skills/*) ;; *) note_skip "$lo_n: leftover from an interrupted run, not ystack's; delete it by hand if you don't need it"; continue ;; esac
+      if [ "$DRY" -eq 1 ]; then say "  $lo_n: would remove (left by an interrupted run)"; continue; fi
+      try rm -f "$lo" || { note_fail "$lo_n" "could not remove it: $ERR"; continue; }
+    elif [ -f "$lo/$MARKER" ] && [ "$(marker_get "$lo" source)" = "$YSTACK_DIR" ]; then
+      if [ "$DRY" -eq 1 ]; then say "  $lo_n: would remove (left by an interrupted run)"; continue; fi
+      delete_tree "$lo" || { note_fail "$lo_n" "could not remove it: $ERR"; continue; }
+    else
+      note_skip "$lo_n: leftover from an interrupted run without this checkout's marker; delete it by hand if you don't need it"
+      continue
+    fi
+    say "  $lo_n: removed (left by an interrupted run)"
+  done
+}
+
+is_temp_name() { case "$1" in .ystack-new-*|.ystack-old-*) return 0 ;; esac; return 1; }
+
+prune_host() { # TARGET: remove this checkout's entries whose skill is gone from ystack
+  [ -d "$1" ] || return 0
+  clean_leftovers "$1"
+  for e in "$1"/* "$1"/.[!.]*; do
+    [ -e "$e" ] || [ -L "$e" ] || continue
+    n="$(basename "$e")"
+    ! is_temp_name "$n" || continue
+    [ -f "$YSTACK_DIR/skills/$n/SKILL.md" ] && continue
+    k="$(entry_kind "$e")"
+    case "$k" in link|copy) ;; *) continue ;; esac
+    from_this_checkout "$e" "$k" || continue
+    retire_owned "$e" "$k" "$n" " (no longer in ystack)"
+  done
+}
+
+uninstall_host() { # TARGET
+  [ -d "$1" ] || return 0
+  clean_leftovers "$1"
+  for e in "$1"/* "$1"/.[!.]*; do
+    [ -e "$e" ] || [ -L "$e" ] || continue
+    n="$(basename "$e")"
+    ! is_temp_name "$n" || continue
+    k="$(entry_kind "$e")"
+    case "$k" in link|copy) ;; *) continue ;; esac
+    retire_owned "$e" "$k" "$n" ""
+  done
+}
+
+host_summary() { # LABEL TARGET
+  line="  $1 ($(pretty "$2")):"
+  if [ "$UNINSTALL" -eq 1 ]; then
+    line="$line $n_rem removed"
+    [ "$n_skip" -eq 0 ] || line="$line, $n_skip kept"
+  else
+    line="$line $n_inst installed, $n_upd updated, $n_same up to date, $n_skip skipped"
+    [ "$n_rem" -eq 0 ] || line="$line, $n_rem removed"
+  fi
+  [ "$n_fail" -eq 0 ] || line="$line, $n_fail failed"
+  add_summary "$line"
+  [ -z "$fails" ] || add_summary "${fails%
+}"
+  [ -z "$skips" ] || add_summary "${skips%
+}"
+}
+
+[ "$DRY" -eq 0 ] || say "Dry run: nothing will change."
+
+for h in $HOSTS; do
+  cur_host="$h"
+  target="$(host_home "$h")/skills"
+  reset_counts
+  # A skills folder that resolves into this checkout (say, linked by hand to ~/ystack/skills) is
+  # the checkout itself: installing or pruning there would move ystack's own files.
+  rt="$(resolve_path "$target")"
+  case "$rt/" in
+    "$YSTACK_DIR"/*)
+      say "$(host_label "$h"): $(pretty "$target") is inside this checkout ($(pretty "$rt")); skipped"
+      add_summary "  $(host_label "$h") ($(pretty "$target")): skipped, it resolves to $(pretty "$rt"), inside this checkout. Setup won't install into its own folder."
+      continue ;;
+  esac
+  if [ "$UNINSTALL" -eq 1 ]; then
+    say "$(host_label "$h"): removing ystack skills from $(pretty "$target")"
+    uninstall_host "$target"
+  else
+    say "$(host_label "$h"): $(pretty "$target") ($MODE mode)"
+    if [ -z "$SKILL_NAMES" ]; then say "  no skills found in $(pretty "$YSTACK_DIR")/skills"; fi
+    for name in $SKILL_NAMES; do install_skill "$h" "$target" "$name"; done
+    prune_host "$target"
+  fi
+  host_summary "$(host_label "$h")" "$target"
+done
+
+# ---- agents (Claude Code only) ----
+
+AGENTS_DST="$HOME/.claude/agents"
+MANIFEST="$AGENTS_DST/.ystack-manifest"
+
+file_sum() { tr -d '\r' <"$1" | cksum | awk '{print $1" "$2}'; }
+manifest_get() { # FILE -> "crc size" from the manifest, empty if absent; non-zero if unreadable
+  [ -f "$MANIFEST" ] || return 0
+  awk -v f="$1" '$1==f {print $2" "$3}' "$MANIFEST"
+}
+
+put_agent() { # SRC DST: write via a temp file so a failed copy never leaves a half file
+  pa_tmp="$2.ystack-new.$$"
+  try cp "$1" "$pa_tmp" || { rm -f "$pa_tmp" 2>/dev/null || true; return 1; }
+  try mv "$pa_tmp" "$2" || { rm -f "$pa_tmp" 2>/dev/null || true; return 1; }
+}
+
+agents_install() {
+  reset_counts
+  say "Agents: $(pretty "$AGENTS_DST")"
+  keep=""
+  if [ "$DRY" -eq 0 ] && ! try mkdir -p "$AGENTS_DST"; then
+    note_fail "agents" "could not create $(pretty "$AGENTS_DST"): $ERR"
+    host_summary Agents "$AGENTS_DST"
+    return
+  fi
+  for src in "$AGENTS_SRC"/*.md; do
+    [ -f "$src" ] || continue
+    b="$(basename "$src")"
+    dst="$AGENTS_DST/$b"
+    want="$(file_sum "$src")"
+    if [ ! -e "$dst" ]; then
+      if [ "$DRY" -eq 0 ] && ! put_agent "$src" "$dst"; then note_fail "$b" "could not install it: $ERR"; continue; fi
+      n_inst=$((n_inst + 1)); keep="$keep$b $want
+"; say "  $b: $(verb install installed)"
+      continue
+    fi
+    have="$(file_sum "$dst")"
+    if [ "$have" = "$want" ]; then
+      n_same=$((n_same + 1)); keep="$keep$b $want
+"; say "  $b: up to date"
+      continue
+    fi
+    rec="$(manifest_get "$b")" || { note_fail "$b" "could not read $(pretty "$MANIFEST")"; continue; }
+    if [ -n "$rec" ] && [ "$rec" = "$have" ]; then
+      if [ "$DRY" -eq 0 ] && ! put_agent "$src" "$dst"; then
+        note_fail "$b" "could not update it: $ERR"
+        keep="$keep$b $rec
+"
+        continue
+      fi
+      n_upd=$((n_upd + 1)); keep="$keep$b $want
+"; say "  $b: $(verb update updated)"
+    elif [ "$FORCE" -eq 1 ]; then
+      if [ "$DRY" -eq 0 ]; then
+        backup_entry "$dst" "agents/$b" || { note_fail "$b" "could not back up $(pretty "$dst"): $ERR; kept yours"; continue; }
+        if ! put_agent "$src" "$dst"; then
+          note_fail "$b" "backed yours up to $(pretty "$BACKUP_PATH"), but could not write ystack's: $ERR"
+          continue
+        fi
+        say "  $b: replaced yours (--force); yours is in $(pretty "$BACKUP_PATH")"
+      else
+        say "  $b: would replace yours (--force)"
+      fi
+      n_upd=$((n_upd + 1)); keep="$keep$b $want
+"
+    else
+      note_skip "$b: differs, kept yours (compare: diff $(pretty "$dst") $(pretty "$src"); --force replaces it)"
+      say "  $b: differs, kept yours"
+    fi
+  done
+  # Files ystack installed earlier that are no longer in ystack: remove them if unedited.
+  if [ -f "$MANIFEST" ]; then
+    while read -r b crc size; do
+      [ -n "$b" ] || continue
+      [ -f "$AGENTS_SRC/$b" ] && continue
+      dst="$AGENTS_DST/$b"
+      if [ -f "$dst" ] && [ "$(file_sum "$dst")" = "$crc $size" ]; then
+        if [ "$DRY" -eq 0 ] && ! try rm -f "$dst"; then
+          note_fail "$b" "could not remove it: $ERR"
+          keep="$keep$b $crc $size
+"
+          continue
+        fi
+        n_rem=$((n_rem + 1)); say "  $b: $(verb remove removed) (no longer in ystack)"
+      fi
+    done <"$MANIFEST"
+  fi
+  if [ "$DRY" -eq 0 ]; then
+    if [ -n "$keep" ]; then
+      if ! { printf '%s' "$keep" >"$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"; } 2>/dev/null; then
+        rm -f "$MANIFEST.tmp" 2>/dev/null || true
+        note_fail "manifest" "could not write $(pretty "$MANIFEST"); ystack will not recognise these agent files on the next update"
+      fi
+    elif [ -f "$MANIFEST" ]; then
+      try rm -f "$MANIFEST" || note_fail "manifest" "could not remove the stale $(pretty "$MANIFEST"): $ERR"
+    fi
+  fi
+  host_summary Agents "$AGENTS_DST"
+}
+
+agents_uninstall() {
+  reset_counts
+  [ -f "$MANIFEST" ] || return 0
+  say "Agents: $(pretty "$AGENTS_DST")"
+  while read -r b crc size; do
+    [ -n "$b" ] || continue
+    dst="$AGENTS_DST/$b"
+    [ -f "$dst" ] || continue
+    if [ "$(file_sum "$dst")" = "$crc $size" ]; then
+      if [ "$DRY" -eq 0 ] && ! try rm -f "$dst"; then note_fail "$b" "could not remove it: $ERR"; continue; fi
+      n_rem=$((n_rem + 1)); say "  $b: $(verb remove removed)"
+    else
+      note_skip "$b: edited since ystack installed it, kept yours"
+    fi
+  done <"$MANIFEST"
+  # Keep the manifest if a removal failed, so the next run can still recognise those files.
+  if [ "$DRY" -eq 0 ] && [ "$n_fail" -eq 0 ]; then
+    try rm -f "$MANIFEST" || note_fail "manifest" "could not remove $(pretty "$MANIFEST"): $ERR"
+  fi
+  line="  Agents ($(pretty "$AGENTS_DST")): $n_rem removed"
+  [ "$n_skip" -eq 0 ] || line="$line, $n_skip kept"
+  [ "$n_fail" -eq 0 ] || line="$line, $n_fail failed"
+  add_summary "$line"
+  [ -z "$fails" ] || add_summary "${fails%
+}"
+  [ -z "$skips" ] || add_summary "${skips%
+}"
+}
+
+case " $HOSTS " in *" claude "*) has_claude=1 ;; *) has_claude=0 ;; esac
+if [ "$UNINSTALL" -eq 1 ]; then
+  [ "$has_claude" -eq 0 ] || agents_uninstall
+elif [ "$DO_AGENTS" -eq 1 ]; then
+  if [ "$has_claude" -eq 1 ]; then
+    agents_install
+  else
+    add_summary "  Agents: skipped (Claude Code only, and the claude host is not selected or ~/.claude does not exist)"
+  fi
+fi
+
+# ---- mods ----
+
+CLAUDE_BIN="${YSTACK_CLAUDE:-claude}"
+first_line() { printf '%s\n' "$1" | sed -n '1p'; }
+
+# marketplace_state -> added | missing | unknown (sets ERR for unknown)
+marketplace_state() {
+  if ms_out="$("$CLAUDE_BIN" plugin marketplace list --json 2>&1)"; then
+    if printf '%s' "$ms_out" | grep -q "\"name\": *\"$MARKETPLACE_NAME\""; then echo added; else echo missing; fi
+    return
+  fi
+  # Older CLI without --json: grep the text listing. Fragile: it depends on the CLI's line format.
+  if ms_out="$("$CLAUDE_BIN" plugin marketplace list 2>&1)"; then
+    if printf '%s' "$ms_out" | grep -Eq "(^|[^A-Za-z0-9_-])$MARKETPLACE_NAME[[:space:]]*\$"; then echo added; else echo missing; fi
+    return
+  fi
+  echo "unknown: $(first_line "$ms_out")"
+}
+
+mods_fail_line() { FAILED=$((FAILED + 1)); add_summary "  Mods: FAILED ($1)"; }
+
+if [ "$UNINSTALL" -eq 1 ]; then
+  if [ "$DO_MODS" -eq 1 ]; then
+    add_summary "  Mods: not removed by setup. To remove them: claude plugin uninstall <mod>@$MARKETPLACE_NAME"
+  fi
+elif [ "$DO_MODS" -eq 1 ]; then
+  if [ "$YES" -eq 1 ] && [ "$DRY" -eq 0 ]; then
+    if ! command -v "$CLAUDE_BIN" >/dev/null 2>&1; then
+      add_summary "  Mods: skipped, the claude CLI was not found on PATH. Install Claude Code, then re-run with --mods --yes."
+    else
+      say "Mods: installing the starter set"
+      mk="$(marketplace_state)"
+      mk_ok=1
+      case "$mk" in
+        added) say "  marketplace $MARKETPLACE_NAME: already added" ;;
+        missing)
+          if ! mk_out="$("$CLAUDE_BIN" plugin marketplace add "$MARKETPLACE_REPO" 2>&1)"; then
+            [ -z "$mk_out" ] || printf '%s\n' "$mk_out" | sed 's/^/    /'
+            mods_fail_line "could not add the $MARKETPLACE_NAME marketplace: $(first_line "$mk_out"); no mods installed"
+            mk_ok=0
+          else
+            say "  marketplace $MARKETPLACE_NAME: added"
+          fi ;;
+        *)
+          mods_fail_line "could not list marketplaces (${mk#unknown: }); no mods installed"
+          mk_ok=0 ;;
+      esac
+      if [ "$mk_ok" -eq 1 ]; then
+        if ! installed_json="$("$CLAUDE_BIN" plugin list --json 2>&1)"; then
+          mods_fail_line "could not read installed plugins ($(first_line "$installed_json")), so setup can't tell which mods are there; no mods installed"
+        else
+          mods_ok=0; mods_new=0; mods_fail=""
+          for m in $STARTER_MODS; do
+            if printf '%s' "$installed_json" | grep -q "\"id\": *\"$m@$MARKETPLACE_NAME\""; then
+              say "  $m: already installed"; mods_ok=$((mods_ok + 1)); continue
+            fi
+            if "$CLAUDE_BIN" plugin install "$m@$MARKETPLACE_NAME"; then
+              mods_ok=$((mods_ok + 1)); mods_new=$((mods_new + 1))
+            else
+              mods_fail="$mods_fail $m"; FAILED=$((FAILED + 1))
+            fi
+          done
+          line="  Mods: $mods_ok of $(echo $STARTER_MODS | wc -w | tr -d ' ') starter mods in place"
+          [ -z "$mods_fail" ] || line="$line; FAILED to install:$mods_fail"
+          [ "$mods_new" -eq 0 ] || line="$line (restart Claude Code to load the new mods)"
+          add_summary "$line"
+        fi
+      fi
+    fi
+  else
+    echo "Mods: run these to add the ystack marketplace and the starter set (or re-run with --mods --yes):"
+    echo "  claude plugin marketplace add $MARKETPLACE_REPO"
+    for m in $STARTER_MODS; do echo "  claude plugin install $m@$MARKETPLACE_NAME"; done
+    command -v "$CLAUDE_BIN" >/dev/null 2>&1 || echo "  (the claude CLI is not on PATH here; install Claude Code first)"
+    add_summary "  Mods: commands printed, nothing installed"
+  fi
+fi
+
+# ---- summary ----
+
+echo ""
+if [ "$DRY" -eq 1 ]; then echo "ystack setup, dry run (nothing changed):"; else echo "ystack setup:"; fi
+printf '%s' "$SUMMARY"
+if [ "$n_fallback" -gt 0 ]; then
+  echo "  $n_fallback skill(s) were copied because a symlink could not be made ($FIRST_LN_ERR)."
+  echo "  Copies don't follow the checkout: re-run ./setup after every git pull, or use /ystack-upgrade."
+fi
+if [ "$UNINSTALL" -eq 0 ] && [ "$QUIET" -eq 0 ]; then
+  echo ""
+  echo "Next:"
+  echo "  /ystack-stats   what ystack saves, replayed on your own logs (mod: ystack-stats; ./setup --mods)"
+  echo "  /ystack-setup   review the recommended Claude Code settings (mod: ystack-setup)"
+  echo "  CLAUDE.md       copy or merge $(pretty "$YSTACK_DIR")/claude/CLAUDE.starter.md into ~/.claude/CLAUDE.md"
+  if [ "$MODE" = copy ]; then
+    echo "  Skills were copied, not linked: re-run ./setup after every git pull, or use /ystack-upgrade."
+  fi
+fi
+if [ "$FAILED" -gt 0 ]; then
+  echo ""
+  echo "setup: $FAILED step(s) failed (see the FAILED lines above); each failed item was left as it was." >&2
+  exit 1
+fi
