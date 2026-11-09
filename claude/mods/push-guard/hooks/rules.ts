@@ -457,21 +457,38 @@ function psRestActions(v: Invocation): Action[] {
   return apiActions(v, url, method, data, `${v.prog} ${url}`.slice(0, 120), unreadable)
 }
 
-/**
- * The command touches git or gh config (an alias, GIT_CONFIG_*, HOME, a config file): an alias it sets up
- * would not exist yet when push-guard looks it up, so a name that isn't a builtin can't be cleared.
- */
-const CONFIG_TOUCH = /\balias\b|GIT_CONFIG|GH_CONFIG_DIR|XDG_CONFIG_HOME|\bHOME=|\.gitconfig|\.git[\\/]+config\b|\binclude(If)?\.|config\.ya?ml/i
 const GIT_RISKY = new Set(['push', 'commit'])
-/** git subcommands that run other commands: `rebase -x`, `submodule foreach`, `bisect run`. */
-const GIT_RUNS = new Set(['rebase', 'submodule', 'bisect'])
 
-const quoteWord = (w: string) => `'${w.replace(/'/g, `'\\''`)}'`
+/**
+ * git calls that run a command push-guard can't follow: `rebase -x/--exec`, `submodule foreach`, `bisect run`,
+ * `for-each-repo`, `filter-branch` (its filters), `difftool -x/--extcmd`. Refused rather than parsed.
+ */
+function runsCommands(sub: string, rest: string[]): boolean {
+  if (sub === 'for-each-repo' || sub === 'filter-branch') return true
+  if (sub === 'rebase') return rest.some(a => a.startsWith('--exec') || /^-[A-Za-z]*x/.test(a))
+  if (sub === 'submodule') return rest.includes('foreach')
+  if (sub === 'bisect') return rest.includes('run')
+  if (sub === 'difftool') return rest.some(a => a.startsWith('--extcmd') || /^-[A-Za-z]*x/.test(a))
+  return false
+}
+
+/** `-c key=value` options before the subcommand whose value git runs as a command (editor, pager, ssh...). */
+const RUN_KEYS = /^(alias\.|.*(editor|pager|sshcommand|helper|external|textconv|\.cmd|program|askpass|fsmonitor|hookspath)=)/i
+function runsConfig(args: string[], subAt: number): boolean {
+  for (let i = 0; i < subAt; i++) {
+    const a = args[i] as string
+    const kv = a === '-c' || a === '--config-env' ? (args[i + 1] ?? '') : /^-c./.test(a) ? a.slice(2) : a.startsWith('--config-env=') ? a.slice(13) : undefined
+    if (kv !== undefined && RUN_KEYS.test(kv.includes('=') ? kv : `${kv}=`)) return true
+  }
+  return false
+}
 
 /** The risky actions in a command line, in order. */
 export function actions(command: string, shell: Shell, depth = 0): Action[] {
   const out: Action[] = []
-  const configTouched = CONFIG_TOUCH.test(command)
+  // An alias is only looked up when the git or gh call is the whole command. Anything else in the line
+  // (git config, an env change, a file write) could set the alias up before it runs, after the lookup.
+  const alone = invocations(command, shell).length === 1 && !/^\s*([A-Za-z_][A-Za-z0-9_]*=|\$env:)/i.test(command)
   // Scope staged by earlier `git add`s in the same command, per repository location.
   let pendingTracked: Scope = 'none'
   let pendingUntracked: Scope = 'none'
@@ -487,16 +504,18 @@ export function actions(command: string, shell: Shell, depth = 0): Action[] {
         out.push({ kind: 'unknown', base, how: `\`git ${v.args.slice(0, subAt + 1).join(' ')}\` uses a variable or shell expansion where push-guard needs to read the words.` })
         continue
       }
+      if (runsConfig(v.args, subAt)) {
+        out.push({ kind: 'unknown', base, how: `\`git ${v.args.slice(0, subAt + 1).join(' ')}\` sets a git option that runs a command (an alias, editor, pager or similar).` })
+        continue
+      }
       if (!BUILTINS.has(sub)) {
-        if (g.inlineAlias || configTouched) out.push({ kind: 'unknown', base, how: `\`git ${g.sub}\` isn't a git command, and this same command sets up config it could be an alias in.` })
+        if (!alone) out.push({ kind: 'unknown', base, how: `\`git ${g.sub}\` isn't a git command, and other parts of this command could set it up as an alias.` })
         else out.push({ kind: 'git-alias', base, sub: g.sub, rest: g.rest })
         continue
       }
-      if (GIT_RUNS.has(sub) && depth < 3) {
-        // A quoted command (`rebase -x "git push -f"`) or the words from a git/gh onwards (`foreach git push -f`).
-        for (const w of g.rest) if (/\s/.test(w)) out.push(...actions(w, 'bash', depth + 1).map(a => ({ ...a, base }) as Action))
-        const at = g.rest.findIndex(a => { const p = progName(a); return p === 'git' || p === 'gh' })
-        if (at >= 0) out.push(...actions(g.rest.slice(at).map(quoteWord).join(' '), 'bash', depth + 1).map(a => ({ ...a, base }) as Action))
+      if (runsCommands(sub, g.rest)) {
+        out.push({ kind: 'unknown', base, how: `\`git ${g.sub}\` here runs another command for you.` })
+        continue
       }
       if (sub === 'add' || sub === 'stage') {
         const s = addScope(g.rest)
@@ -514,7 +533,7 @@ export function actions(command: string, shell: Shell, depth = 0): Action[] {
       if (isDynamic(group) || isExpanded(group) || (group === 'repo' && verb !== undefined && (isDynamic(verb) || isExpanded(verb)))) {
         out.push({ kind: 'unknown', base, how: `\`gh ${v.args.slice(0, 2).join(' ')}\` uses a variable or shell expansion where push-guard needs to read the words.` })
       } else if (!GH_CORE.has(group)) {
-        if (configTouched) out.push({ kind: 'unknown', base, how: `\`gh ${group}\` isn't a gh command, and this same command sets up config it could be an alias in.` })
+        if (!alone) out.push({ kind: 'unknown', base, how: `\`gh ${group}\` isn't a gh command, and other parts of this command could set it up as an alias.` })
         else out.push({ kind: 'gh-alias', base, sub: group, rest: v.args.slice(1) })
       } else out.push(...ghActions(v))
     } else if (v.prog === 'curl') {
@@ -536,7 +555,7 @@ export function actions(command: string, shell: Shell, depth = 0): Action[] {
 function launchedIsSafe(tool: string, after: string[]): boolean {
   if (tool === 'git') {
     const g = gitCall(after)
-    if (!g || g.inlineAlias) return false
+    if (!g || g.inlineAlias || runsConfig(after, after.length - g.rest.length - 1)) return false
     const sub = g.sub.toLowerCase()
     return !isDynamic(sub) && !isExpanded(sub) && BUILTINS.has(sub) && !LAUNCHED_GIT_RISKY.has(sub)
   }
@@ -546,10 +565,10 @@ function launchedIsSafe(tool: string, after: string[]): boolean {
 
 /** Programs that print or search their words rather than run them. */
 const NO_EXEC = new Set(['echo', 'printf', 'write-host', 'write-output', 'grep', 'egrep', 'fgrep', 'rg', 'ag', 'man', 'which', 'where', 'whereis', 'type', 'get-command', 'gcm', 'tldr', 'git', 'gh'])
-const LAUNCHED_GIT_RISKY = new Set(['push', 'commit', 'config', ...GIT_RUNS])
+const LAUNCHED_GIT_RISKY = new Set(['push', 'commit', 'config', 'rebase', 'submodule', 'bisect', 'for-each-repo', 'filter-branch', 'difftool', 'mergetool'])
 const LAUNCHED_GH_RISKY = new Set(['repo', 'api', 'alias', 'extension'])
 /** gh's own top-level commands; any other name is an alias or an extension. */
-const GH_CORE = new Set(
+export const GH_CORE = new Set(
   ('accessibility agent-task alias api attestation auth browse cache codespace completion config copilot cs extension gist gpg-key help ' +
     'issue label org pr preview project release repo ruleset run search secret ssh-key status variable version workflow').split(' '),
 )

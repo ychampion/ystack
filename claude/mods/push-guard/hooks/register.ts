@@ -1,7 +1,7 @@
 import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 import type { Shell } from './parse.ts'
-import { actions, globMatch, hasPlaceholder, isDynamic, isExpanded, repoName, type Action, type Base, type CommitAction, type PushAction, type Scope } from './rules.ts'
+import { GH_CORE, actions, globMatch, hasPlaceholder, isDynamic, isExpanded, repoName, type Action, type Base, type CommitAction, type PushAction, type Scope } from './rules.ts'
 import { COMMIT_MARK, describe, scanDiff, scanFile, type Finding } from './secrets.ts'
 
 type Config = { allowPaths: string[]; protectedRepos: string[]; protectedBranches: string[] }
@@ -270,7 +270,8 @@ async function check($: EngineInterface, w: Where, a: Action, cfg: Config, notes
       // Not an alias: an extension (`gh dash`) or a typo.
       if (!line) break
       let expansion = (line[2] ?? '').trim().replace(/^(['"])(.*)\1$/, '$2')
-      if (expansion.startsWith('!') || depth >= 3) {
+      // Only a plain one-line expansion starting with a gh command is followed; YAML blocks, escapes or anything else are refused.
+      if (expansion.startsWith('!') || depth >= 3 || /[\\|>"']/.test(expansion) || !GH_CORE.has(expansion.split(/\s+/)[0] ?? '')) {
         why.push(`\`gh ${a.sub}\` is a gh alias for \`${expansion.slice(0, 80)}\`. Run the command it stands for directly, so push-guard can check it.`)
         break
       }

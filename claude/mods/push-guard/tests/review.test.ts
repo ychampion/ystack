@@ -329,3 +329,37 @@ test('S4 gh aliases are checked as what they stand for; literal read-only launch
   await $.tool.call({ tool: 'Bash', command: 'find . -name .git -execdir git log -1 \\;' })
   expect(seen).toEqual(['gh co 12', 'ls | xargs -I{} git -C {} status --short', 'find . -name .git -execdir git log -1 \\;'])
 })
+
+// Third security review: commands git runs for you are refused, not parsed; aliases only when alone.
+
+test('S5 exec options, command-running -c keys, env prefixes and YAML alias blocks are refused; identity -c still runs', async ($, on) => {
+  host(on, args => (has(args, 'config', '--get') ? { code: 1 } : branches('feature', 'feature')(args)), args =>
+    args[0] === 'alias' && args[1] === 'list' ? 'blk: |\n  repo edit --visibility public\nq: "repo edit acme/x --visibility public"\n' : undefined,
+  )
+  const seen = shell(on)
+  for (const cmd of [
+    'git rebase --exec="git push -f origin main" main',
+    'git rebase -ix "git push -f origin main" main',
+    'git for-each-repo --config=maintenance.repo push',
+    "git filter-branch --tree-filter 'git push -f origin main' HEAD",
+    'git difftool --extcmd="git push -f origin main"',
+    'git -c core.editor="git push -f origin main" commit',
+    "git -c core.pager='sh -c \"git push -f origin main\"' log",
+    'git -c alias.p=push p -f origin main',
+    'USERPROFILE=C:/x git zz -f origin main',
+    'gh blk',
+    'gh q',
+  ]) expect([cmd, refusal(await $.tool.call({ tool: 'Bash', command: cmd })) ?? 'ran']).toEqual([cmd, expect.stringMatching(/push-guard/)])
+  expect(seen).toEqual([])
+  const ok = 'git -c user.name=me -c user.email=me@example.com commit -m x'
+  await $.tool.call({ tool: 'Bash', command: ok })
+  await $.tool.call({ tool: 'Bash', command: 'git rebase -i main' })
+  expect(seen).toEqual([ok, 'git rebase -i main'])
+})
+
+test('S5 PowerShell: an env change before an unknown git name is refused', async ($, on) => {
+  host(on, args => (has(args, 'config', '--get') ? { code: 1 } : undefined))
+  const seen = shell(on)
+  expect(refusal(await $.tool.call({ tool: 'PowerShell', command: "$env:HOME='C:/x'; git zz -f origin main" }))).toContain('push-guard')
+  expect(seen).toEqual([])
+})
