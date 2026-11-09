@@ -357,6 +357,29 @@ test('S5 exec options, command-running -c keys, env prefixes and YAML alias bloc
   expect(seen).toEqual([ok, 'git rebase -i main'])
 })
 
+test('S6 abbreviated long options, include.path, and env or wrappers before an alias are refused', async ($, on) => {
+  host(on, args => (has(args, 'config', '--get') ? { code: 1 } : branches('feature', 'feature')(args)))
+  const seen = shell(on)
+  for (const cmd of [
+    'git push --force-w origin main',
+    'git push --forc origin main',
+    'git push origin --del main',
+    'git push --mir origin',
+    'git rebase --exe="git push -f origin main" main',
+    'git rebase --ex "git push -f origin main" main',
+    'git difftool --extc="git push -f origin main"',
+    'git -c include.path=/tmp/evil zz -f origin main',
+    'git -c includeIf.onbranch:feature.path=/tmp/evil zz -f origin main',
+    'sudo HOME=/tmp/h git zz -f origin main',
+    'env GIT_CONFIG_GLOBAL=/tmp/g git zz -f origin main',
+    'bash -c "git zz -f origin main"',
+  ]) expect([cmd, refusal(await $.tool.call({ tool: 'Bash', command: cmd })) ?? 'ran']).toEqual([cmd, expect.stringMatching(/push-guard/)])
+  expect(seen).toEqual([])
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-w origin feature' })
+  await $.tool.call({ tool: 'Bash', command: 'git push --dry origin feature' })
+  expect(seen).toEqual(['git push --force-w origin feature', 'git push --dry origin feature'])
+})
+
 test('S5 PowerShell: an env change before an unknown git name is refused', async ($, on) => {
   host(on, args => (has(args, 'config', '--get') ? { code: 1 } : undefined))
   const seen = shell(on)

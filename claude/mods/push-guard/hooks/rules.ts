@@ -167,6 +167,16 @@ function commitScope(rest: string[]): Scope {
 }
 
 const PUSH_VALUE = new Set(['-o', '--push-option', '--receive-pack', '--exec', '--repo'])
+/** git push's long options; git accepts any unambiguous prefix of one (`--force-w`, `--del`). */
+const PUSH_LONG = ['all', 'branches', 'mirror', 'delete', 'tags', 'dry-run', 'porcelain', 'force', 'force-with-lease', 'no-force-with-lease',
+  'force-if-includes', 'no-force-if-includes', 'recurse-submodules', 'no-recurse-submodules', 'atomic', 'no-atomic', 'push-option',
+  'receive-pack', 'exec', 'repo', 'set-upstream', 'thin', 'no-thin', 'quiet', 'verbose', 'progress', 'no-progress', 'verify', 'no-verify',
+  'follow-tags', 'no-follow-tags', 'signed', 'no-signed', 'ipv4', 'ipv6', 'prune', 'no-prune']
+/** Every long option `--name` could mean: the exact one, or each option it is a prefix of. */
+function longNames(name: string, all: string[]): string[] {
+  const n = name.replace(/^--/, '')
+  return all.includes(n) ? [n] : all.filter(o => o.startsWith(n))
+}
 
 function stripHeads(ref: string): string {
   return ref.replace(/^refs\/heads\//, '')
@@ -210,15 +220,19 @@ function pushAction(v: Invocation, replay: string[], rest: string[]): PushAction
       continue
     }
     if (a.startsWith('--')) {
-      const name = a.split('=')[0] as string
-      if (name === '--force' || name === '--force-with-lease') force = true
-      else if (name === '--delete') del = true
-      else if (name === '--prune') prune = true
-      else if (name === '--mirror') mirror = true
-      else if (name === '--all' || name === '--branches') all = true
-      else if (name === '--tags') tags = true
-      else if (name === '--repo') repoOpt = a.includes('=') ? a.slice(7) : rest[i + 1]
-      if (PUSH_VALUE.has(a)) i++
+      const raw = a.split('=')[0] as string
+      // Any option the abbreviation could stand for counts (git refuses a truly ambiguous one anyway).
+      const names = longNames(raw, PUSH_LONG)
+      const means = (o: string) => names.includes(o)
+      if (means('force') || means('force-with-lease')) force = true
+      if (means('delete')) del = true
+      if (means('prune')) prune = true
+      if (means('mirror')) mirror = true
+      if (means('all') || means('branches')) all = true
+      if (means('tags')) tags = true
+      const valued = names.length === 1 && ['push-option', 'receive-pack', 'exec', 'repo'].includes(names[0] as string)
+      if (names.length === 1 && names[0] === 'repo') repoOpt = a.includes('=') ? a.slice(a.indexOf('=') + 1) : rest[i + 1]
+      if (valued && !a.includes('=')) i++
       continue
     }
     for (let k = 1; k < a.length; k++) {
@@ -465,15 +479,15 @@ const GIT_RISKY = new Set(['push', 'commit'])
  */
 function runsCommands(sub: string, rest: string[]): boolean {
   if (sub === 'for-each-repo' || sub === 'filter-branch') return true
-  if (sub === 'rebase') return rest.some(a => a.startsWith('--exec') || /^-[A-Za-z]*x/.test(a))
+  if (sub === 'rebase') return rest.some(a => /^--e(x(e(c)?)?)?(=|$)/.test(a) || /^-[A-Za-z]*x/.test(a) || /\s/.test(a))
   if (sub === 'submodule') return rest.includes('foreach')
   if (sub === 'bisect') return rest.includes('run')
-  if (sub === 'difftool') return rest.some(a => a.startsWith('--extcmd') || /^-[A-Za-z]*x/.test(a))
+  if (sub === 'difftool') return rest.some(a => /^--ext(c(m(d)?)?)?(=|$)/.test(a) || /^-[A-Za-z]*x/.test(a) || /\s/.test(a))
   return false
 }
 
 /** `-c key=value` options before the subcommand whose value git runs as a command (editor, pager, ssh...). */
-const RUN_KEYS = /^(alias\.|.*(editor|pager|sshcommand|helper|external|textconv|\.cmd|program|askpass|fsmonitor|hookspath)=)/i
+const RUN_KEYS = /^(alias\.|include\.|includeif\.|.*(editor|pager|sshcommand|helper|external|textconv|\.cmd|program|askpass|fsmonitor|hookspath)=)/i
 function runsConfig(args: string[], subAt: number): boolean {
   for (let i = 0; i < subAt; i++) {
     const a = args[i] as string
@@ -488,7 +502,7 @@ export function actions(command: string, shell: Shell, depth = 0): Action[] {
   const out: Action[] = []
   // An alias is only looked up when the git or gh call is the whole command. Anything else in the line
   // (git config, an env change, a file write) could set the alias up before it runs, after the lookup.
-  const alone = invocations(command, shell).length === 1 && !/^\s*([A-Za-z_][A-Za-z0-9_]*=|\$env:)/i.test(command)
+  const alone = invocations(command, shell).length === 1 && /^\s*(git|gh)(\.exe)?\s/i.test(command)
   // Scope staged by earlier `git add`s in the same command, per repository location.
   let pendingTracked: Scope = 'none'
   let pendingUntracked: Scope = 'none'
