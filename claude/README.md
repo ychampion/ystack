@@ -8,6 +8,8 @@ All of them, in one line:
 /plugin install ystack --marketplace ychampion/ystack
 ```
 
+Several mods act on their own once installed: see [What changes when you install everything](#what-changes-when-you-install-everything) first.
+
 Or one at a time:
 
 ```
@@ -15,6 +17,45 @@ Or one at a time:
 ```
 
 In the desktop app's Code tab: + next to the prompt box → Plugins → Add marketplace `ychampion/ystack` → Add plugin.
+
+## What changes when you install everything
+
+Most mods wait for a command (`/handoff`, `/why`, `/diet`, `/queue`, …). The ones below act by themselves as soon as they are installed. Read this list before you install the whole bundle: each one is useful, but some of them change how a session behaves, and you should know which is which.
+
+**Changes your conversation or Claude's turns**
+
+| Mod | What you'll notice | Turn it off |
+| --- | --- | --- |
+| `context-meter` | Once a conversation passes about 250k tokens, it swaps the conversation, between turns, for a short handoff note plus Claude's last reply. That happens after a push or merge, when a session is running on its own, or after 50 idle minutes. If you didn't expect it, it looks like your chat was replaced. The note is saved in `~/.claude/plans/`. | `autoHandoff` off (keeps `/handoff` and `/ctx`), or raise `handoffAt` |
+| `keep-going` | When Claude ends a turn by offering safe, in-scope work ("want me to continue?"), it sends Claude back to do it. At most twice per request, with a toast each time. | `enabled` off |
+| `spec-sharpener` | On a large, open-ended build request, Claude asks 3-4 questions before it starts. | `/sharpen off` |
+| `verify` | Holds Claude, and every subagent, when it says "done" after editing without running a check, and sends it back to run one. | disable the mod |
+| `loop-breaker` | When an agent repeats the same failure, it adds a note, then gets a second opinion from the same model (one extra call), then stops the agent and leaves you a decision in the inbox. | `secondOpinion` off, or raise `repeats` |
+| `brief-linter` | Adds missing requirements to every subagent brief: a real check, long output to a file, an "Assumptions I made" section, a loop cap. | disable the mod |
+| `assumptions-ledger` | Hands each subagent's assumptions to the main Claude to check. | disable the mod |
+| `model-router` | Sets the effort for `general-purpose` subagents that don't name their own (high for reviews, security and hard bugs, medium for builds) and puts lookups and log triage on the fast model (`haiku`). It picks no other model until you set `strongModel`. A model or effort you set yourself is kept unless you turn on `enforce`. | disable the mod |
+
+**Stops or holds back commands**
+
+| Mod | What you'll notice | Turn it off |
+| --- | --- | --- |
+| `push-guard` | Refuses a push or commit that holds an API key, making a repo public, force-pushing to `main`/`master`, and deleting remote branches or repos. `/push-guard allow` lets one through. | `mode` → `warn` |
+| `package-bouncer` | Stops installs of packages that don't exist, are younger than 14 days, look like a popular name, or have known security holes. `/allow-package` lets one through. | `minAgeDays` 0 for the age check, or disable the mod |
+| `slop-guard` | Flags AI-design tells in UI edits; four unmistakable ones (gradient text, glows, banned fonts, fake content) hold the turn until they're fixed or explained. | `enabled` off, or `ruleLevels` per rule |
+| `iron-rules` | Off by default. The one exception: it always blocks nested Windows shell deletes (`cmd /c rmdir` inside PowerShell), whose quoting breaks. | — |
+
+**Changes what Claude reads or what you see**
+
+| Mod | What you'll notice | Turn it off |
+| --- | --- | --- |
+| `output-diet` | Build, install and test output over 150 lines is shortened before Claude reads it; errors are kept and the full output is saved to a file. | `enabled` off |
+| `owner-view` | A plain-English caption under each tool row (a small, capped model call for commands it doesn't recognize), a "while you were away" brief after 45 idle minutes, and a suggested next step in the prompt box. | `captions`, `suggestions` off, or raise `awayMinutes` |
+| `memory-recall` | When a tool call fails, points Claude at the memory note or skill that matches the error. | disable the mod |
+| `session-recovery`, `model-checkup`, `auto-claudeception`, `pin` | Only suggest something in a toast or the prompt box (reopen crashed sessions, run a prompt audit, save a skill, pin a rule). They never act on their own. | disable the mod |
+
+**Off until you set them up:** `iron-rules`, `user-voice` (needs a notes folder), `operator-context` (needs a profile file), `twins` (needs a `twins.json`), `verify`'s live test runner, the `prompt-diet` and `weekly-digest` options that change or send anything.
+
+Settings are in `/config` under each mod's name. To disable a mod: `/plugin` → Installed → pick it, or `claude plugin disable <mod>@ystack`. If you only want some of the mods, skip the bundle and install the ones you want one at a time.
 
 ## Start here
 

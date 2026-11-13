@@ -22,6 +22,8 @@ claude plugin install ystack --marketplace ychampion/ystack
 
 This adds the `ystack` marketplace and installs all 34 mods plus the `self-learning` plugin. Restart Claude Code (or run `/reload-plugins`) to load them. Don't want one of them? `claude plugin uninstall <mod>` removes just that one. Mods with settings show a settings screen during install; change them later in `/config`.
 
+Some mods act on their own from the start. For example, `context-meter` swaps a very long conversation for a short handoff note, `keep-going` sends Claude back to work when it offers to continue, and `push-guard` refuses risky pushes. Before installing everything, read [what changes when you install everything](claude/README.md#what-changes-when-you-install-everything), which also says how to turn each one off.
+
 Then run `/ystack-stats` to see what ystack would have saved on your last two weeks of logs, and `/ystack-setup` to walk through the recommended settings. Nothing changes until you Apply.
 
 In the Claude desktop app's Code tab, `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `ychampion/ystack`, then Add plugin. A mod installed from a terminal at user scope also loads in the desktop app's local Code sessions. Mods run inside Claude Code; they don't run in claude.ai chat, and cloud sessions need their own installation.

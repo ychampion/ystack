@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Docs: [What changes when you install everything](claude/README.md#what-changes-when-you-install-everything) lists every mod that acts on its own after install (handoffs, nudges, guards, shortened output), what you'll notice, and the setting that turns each one off. The main README points to it from the install line.
+
 - Installing everything no longer imposes one person's habits: `iron-rules` 0.2.1 has every house rule off until you turn it on (`useBun`, `noAttribution`, git identity), and `user-voice` 0.1.1 does nothing until you have a notes folder.
 - `review-panel` 0.1.1: `/review-panel` answered "no command.run hook answered it" and queued nothing; it now queues the panel right after the command returns. `night-shift` 0.1.1: `/queue start` (with no time) silently never started; same fix.
 - New mod `code-threads`: `/why <file:line>` traces code back to the Claude conversation that wrote it (what was asked, the reasoning, the session to reopen); Claude can call it as a tool too. Links are kept on your machine, never in git history.
