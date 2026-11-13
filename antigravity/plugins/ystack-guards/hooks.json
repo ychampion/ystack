@@ -1,0 +1,21 @@
+{
+  "ystack-push-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [{ "type": "command", "command": "node scripts/push-guard.mjs", "timeout": 30 }]
+      }
+    ]
+  },
+  "ystack-package-bouncer": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [{ "type": "command", "command": "node scripts/package-bouncer.mjs", "timeout": 30 }]
+      }
+    ]
+  },
+  "ystack-verify": {
+    "Stop": [{ "type": "command", "command": "node scripts/verify.mjs", "timeout": 30 }]
+  }
+}

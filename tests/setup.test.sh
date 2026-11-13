@@ -58,6 +58,13 @@ make_fixture() { # DIR
   printf -- '---\nname: beta\ndescription: test skill beta\n---\nbeta v1\n' >"$1/skills/beta/SKILL.md"
   printf 'notes\n' >"$1/skills/beta/references/notes.md"
   mkdir -p "$1/skills/not-a-skill" # no SKILL.md: must be ignored
+  mkdir -p "$1/antigravity/plugins/guard/scripts" "$1/antigravity/plugins/not-a-plugin"
+  printf '{ "name": "guard", "version": "1.0.0" }
+' >"$1/antigravity/plugins/guard/plugin.json"
+  printf '{ "g": { "Stop": [ { "command": "node scripts/g.mjs" } ] } }
+' >"$1/antigravity/plugins/guard/hooks.json"
+  printf 'console.log("{}")
+' >"$1/antigravity/plugins/guard/scripts/g.mjs"
 }
 
 new_home() { # NAME [dirs...] -> sets H
@@ -132,6 +139,61 @@ run "$FX" --host agy
 check "--host agy installs there" is_ours "$H/.gemini/config/skills/beta"
 run "$FX" --host antigravity --uninstall
 check "--uninstall removes them" sh -c '[ ! -e "$1/alpha" ] && [ ! -e "$1/beta" ]' _ "$H/.gemini/config/skills"
+
+section "Antigravity plugins: antigravity/plugins/* into ~/.gemini/config/plugins"
+new_home agyplug .gemini/antigravity .gemini/config/plugins/vendor-plugin
+printf '{ "name": "vendor-plugin" }
+' >"$H/.gemini/config/plugins/vendor-plugin/plugin.json"
+run "$FX" --host agy
+check "exit 0" [ "$RC" -eq 0 ]
+check "the plugin is installed" is_ours "$H/.gemini/config/plugins/guard"
+check "with its hooks and scripts" sh -c '[ -f "$1/hooks.json" ] && [ -f "$1/scripts/g.mjs" ] && [ -f "$1/plugin.json" ]' _ "$H/.gemini/config/plugins/guard"
+check "a folder without plugin.json is ignored" [ ! -e "$H/.gemini/config/plugins/not-a-plugin" ]
+check "summary names the plugin folder" has "Antigravity plugins (~/.gemini/config/plugins): 1 installed"
+check "another plugin is left alone" [ -f "$H/.gemini/config/plugins/vendor-plugin/plugin.json" ]
+if [ "$MODE" = link ]; then
+  check "plugin link points into the checkout" [ "$(readlink "$H/.gemini/config/plugins/guard")" = "$FX/antigravity/plugins/guard" ]
+else
+  check "plugin copy carries the marker" sh -c 'grep -q "^source=$2$" "$1/.ystack" && grep -q "^skill=guard$" "$1/.ystack"' _ "$H/.gemini/config/plugins/guard" "$FX"
+fi
+run "$FX" --host agy
+check "re-run: plugin up to date" has "Antigravity plugins (~/.gemini/config/plugins): 0 installed, 0 updated, 1 up to date"
+printf '{ "name": "guard", "version": "1.0.1" }
+' >"$FX/antigravity/plugins/guard/plugin.json"
+run "$FX" --host agy
+if [ "$MODE" = copy ]; then
+  check "a changed plugin is updated" sh -c 'grep -q "1.0.1" "$1/plugin.json"' _ "$H/.gemini/config/plugins/guard"
+  printf 'mine
+' >>"$H/.gemini/config/plugins/guard/hooks.json"
+  printf '{ "name": "guard", "version": "1.0.2" }
+' >"$FX/antigravity/plugins/guard/plugin.json"
+  run "$FX" --host agy
+  check "an edited plugin copy is kept" sh -c 'grep -q mine "$1/hooks.json" && grep -q "1.0.1" "$1/plugin.json"' _ "$H/.gemini/config/plugins/guard"
+  check "and reported as skipped" has "guard: .* was edited since ystack installed it"
+  run "$FX" --host agy --force
+  check "--force replaces it" sh -c '! grep -q mine "$1/hooks.json" && grep -q "1.0.2" "$1/plugin.json"' _ "$H/.gemini/config/plugins/guard"
+else
+  check "a changed plugin is live through the link" sh -c 'grep -q "1.0.1" "$1/plugin.json"' _ "$H/.gemini/config/plugins/guard"
+fi
+printf '{ "name": "guard", "version": "1.0.0" }
+' >"$FX/antigravity/plugins/guard/plugin.json"
+mkdir -p "$H/.gemini/config/plugins/guard-two"
+printf '{ "name": "mine" }
+' >"$H/.gemini/config/plugins/guard-two/plugin.json"
+cp -R "$FX/antigravity/plugins/guard" "$FX/antigravity/plugins/extra"
+run "$FX" --host agy
+check "a second plugin installs" is_ours "$H/.gemini/config/plugins/extra"
+rm -rf "$FX/antigravity/plugins/extra"
+run "$FX" --host agy
+check "a plugin gone from ystack is pruned" sh -c '[ ! -e "$1/extra" ] && printf "%s" "$2" | grep -q "extra: removed (no longer in ystack)"' _ "$H/.gemini/config/plugins" "$OUT"
+check "the skills pass does not prune plugins, nor the reverse" sh -c '[ -e "$1/.gemini/config/plugins/guard" ] && [ -e "$1/.gemini/config/skills/alpha" ]' _ "$H"
+run "$FX" --host agy --uninstall
+check "--uninstall removes the plugin" [ ! -e "$H/.gemini/config/plugins/guard" ]
+check "--uninstall keeps other plugins" sh -c '[ -f "$1/vendor-plugin/plugin.json" ] && [ -f "$1/guard-two/plugin.json" ]' _ "$H/.gemini/config/plugins"
+check "--uninstall summary names the plugin folder" has "Antigravity plugins (~/.gemini/config/plugins): 1 removed"
+new_home claudeonly .claude
+run "$FX" --host claude
+check "other hosts get no Antigravity plugins" [ ! -e "$H/.gemini" ]
 new_home nohost
 run "$FX"
 check "no host found: non-zero exit with a hint" sh -c '[ "$1" -ne 0 ] && printf "%s" "$2" | grep -q -- "--host"' _ "$RC" "$OUT"

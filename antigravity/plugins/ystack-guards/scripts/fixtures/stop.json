@@ -1,0 +1,12 @@
+{
+  "continuationActive": false,
+  "conversationId": "00000000-0000-4000-8000-000000000002",
+  "cwd": "",
+  "error": "",
+  "executionNum": 1,
+  "fullyIdle": true,
+  "hookEventName": "Stop",
+  "terminationReason": "NO_TOOL_CALL",
+  "transcriptPath": "",
+  "workspacePaths": []
+}

@@ -77,7 +77,7 @@ Headless, the guards and rewrites work as usual (`push-guard`, `verify`, `packag
 git clone https://github.com/ychampion/ystack.git ~/ystack && ~/ystack/setup
 ```
 
-Setup installs every skill in `skills/` for each agent you have (Claude Code, Codex, OpenCode, Antigravity). Run it again to update them. Machine-specific values, including your git identity, thresholds, and paths, are settings you fill in at install.
+Setup installs every skill in `skills/` for each agent you have (Claude Code, Codex, OpenCode, Antigravity). For Antigravity it also installs the `ystack-guards` plugin into `~/.gemini/config/plugins`; quit the Antigravity app before updating or removing it, because the app keeps the folder open. Run it again to update them. Machine-specific values, including your git identity, thresholds, and paths, are settings you fill in at install.
 
 On macOS and Linux, skills are symlinks into the checkout, so `git pull` updates them. On Windows (Git Bash), they are copies: re-run `./setup` after each pull, or use `/ystack-upgrade`.
 
@@ -106,6 +106,7 @@ Later, `/ystack-upgrade` pulls, re-runs setup for the same hosts, and updates in
 | --- | --- | --- |
 | [`claude/`](claude/) | Claude Code | 34 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
 | [`skills/`](skills/) | Claude Code, Codex, OpenCode, Antigravity (Gemini models, in the app and the `agy` CLI), and other agents that read skills | 20 skills: engineering workflow (`blast-radius`, `interrogate`, `arena`, `recall`), design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
+| [`antigravity/`](antigravity/plugins/ystack-guards/) | Antigravity (the app and the `agy` CLI) | `ystack-guards`, a plugin with three guards as Antigravity hooks: `push-guard` (no keys in a push, no repo made public, no force-push to `main`), `package-bouncer` (no made-up or brand-new packages) and `verify` (no "done" without a check). `./setup` installs it with the skills |
 | [`codex/`](codex/) | Codex CLI | A brief template for unattended `codex exec` runs; pairs with the `codex-ladder` mod |
 | [`ops/`](ops/) | Any Linux server | `security-sweep`: a weekly scan of OS packages, repos, and containers that installs only restart-free security patches and reports the rest |
 

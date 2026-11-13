@@ -3,16 +3,15 @@
 ## Unreleased
 
 - Docs: [What changes when you install everything](claude/README.md#what-changes-when-you-install-everything) lists every mod that acts on its own after install (handoffs, nudges, guards, shortened output), what you'll notice, and the setting that turns each one off. The main README points to it from the install line.
-
 - Installing everything no longer imposes one person's habits: `iron-rules` 0.2.1 has every house rule off until you turn it on (`useBun`, `noAttribution`, git identity), and `user-voice` 0.1.1 does nothing until you have a notes folder.
 - `review-panel` 0.1.1: `/review-panel` answered "no command.run hook answered it" and queued nothing; it now queues the panel right after the command returns. `night-shift` 0.1.1: `/queue start` (with no time) silently never started; same fix.
 - New mod `code-threads`: `/why <file:line>` traces code back to the Claude conversation that wrote it (what was asked, the reasoning, the session to reopen); Claude can call it as a tool too. Links are kept on your machine, never in git history.
 - Headless support (`claude -p`, the Agent SDK, harnesses such as T3 Code): `context-meter` starts no turns or compactions of its own there, and `model-checkup` saves its one-time reminder for an interactive session. Checked with a real `claude -p` run.
-- `./setup` installs the skills into Antigravity (Google's agent app and its `agy` CLI, on Gemini models): found automatically, or `--host antigravity` / `--host agy`.
+- `./setup` installs the skills into Antigravity (Google's agent app and its `agy` CLI, on Gemini models): found automatically, or `--host antigravity` / `--host agy`. It also installs `ystack-guards`, an Antigravity plugin with `push-guard`, `package-bouncer` and `verify` as hooks; checked live in `agy`, where a key push and a made-up npm package were both refused.
 - Long-sessions doc: how the one-hour cache cliff differs from compaction.
 - `self-learning` plugin joins ystack: `/learn <topic>` turns a technology's docs into a reusable skill. Its agents now use your session's model, skills are saved only where updates can't overwrite them, and its command metadata parses again.
 - Engineering workflow skills: `blast-radius`, `interrogate`, `arena`, `recall`.
-- `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 33 mods in one go.
+- `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 34 mods in one go.
 - README: install everything first, then a grouped list of the mods to pick from, and how to update (auto-update or by hand).
 
 ## 0.1.0 (2026-11-14): first public release

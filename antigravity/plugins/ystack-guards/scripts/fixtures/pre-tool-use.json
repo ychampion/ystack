@@ -1,0 +1,16 @@
+{
+  "artifactDirectoryPath": "",
+  "conversationId": "00000000-0000-4000-8000-000000000001",
+  "cwd": "",
+  "hookEventName": "PreToolUse",
+  "lastUserInput": "push my work",
+  "modelName": "test-model",
+  "stepIdx": 3,
+  "toolCall": {
+    "args": { "CommandLine": "echo hello", "WaitMsBeforeAsync": 0, "toolSummary": "run a command" },
+    "id": "call-1",
+    "name": "run_command"
+  },
+  "transcriptPath": "",
+  "workspacePaths": []
+}

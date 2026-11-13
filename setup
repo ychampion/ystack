@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # ystack setup: install ystack's skills for your agent hosts (Claude Code, Codex, OpenCode,
-# Antigravity),
-# and on request its Claude Code subagent types and a starter set of mods.
+# Antigravity), its Antigravity plugins (antigravity/plugins/), and on request its Claude Code
+# subagent types and a starter set of mods.
 #
 # Works in bash 3.2 (macOS), bash on Linux, and Git Bash on Windows. Keep it that way:
 # no arrays, no associative arrays, no ${x,,}, no mapfile, no readlink -f.
 #
 # Ownership rule: setup only ever removes or replaces entries it can prove are ystack's:
-#   - a symlink that resolves into a ystack checkout's skills/<same name> folder, or
+#   - a symlink that resolves into a ystack checkout's skills/<same name> folder (for Antigravity
+#     plugins, antigravity/plugins/<same name>), or
 #   - a copied folder holding the marker file `.ystack` (written by this script) whose skill= line
 #     matches the folder's name.
 # Anything else at a skill's path is the user's and is skipped, unless --force, which moves it
@@ -23,6 +24,10 @@ unset CDPATH
 
 YSTACK_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 MARKER=".ystack"
+# What is being installed: skills (skills/<name>/SKILL.md) or, for Antigravity, plugins
+# (antigravity/plugins/<name>/plugin.json). The ownership helpers below read these two.
+SRC_SUB="skills"
+SRC_FILE="SKILL.md"
 AGENTS_SRC="$YSTACK_DIR/claude/agents"
 MARKETPLACE_REPO="ychampion/ystack"
 MARKETPLACE_NAME="ystack"
@@ -42,7 +47,8 @@ usage() {
   cat <<'EOF'
 Usage: ./setup [options]
 
-Installs every skill in skills/ for your agent hosts. Re-run it to update.
+Installs every skill in skills/ for your agent hosts, and for Antigravity every
+plugin in antigravity/plugins/. Re-run it to update.
 
   --host <list>   claude, codex, opencode, antigravity (or agy), all, or auto
                   (default: auto = every host whose home folder exists).
@@ -62,6 +68,7 @@ Skill folders:  Claude Code  ~/.claude/skills
                 Codex        ${CODEX_HOME:-~/.codex}/skills
                 OpenCode     ~/.config/opencode/skills
                 Antigravity  ~/.gemini/config/skills
+Plugin folder:  Antigravity  ~/.gemini/config/plugins
 macOS and Linux get symlinks into this checkout; Windows gets copies (re-run after git pull).
 EOF
 }
@@ -204,6 +211,21 @@ try() {
   return 1
 }
 
+# mv_dir SRC DST: rename a folder. On Windows a running app (Antigravity watches its plugins folder)
+# or a virus scanner can hold a just-written folder open for a moment, so retry there for up to ~10 s.
+mv_dir() {
+  try mv "$1" "$2" && return 0
+  [ "$IS_WINDOWS" -eq 1 ] || return 1
+  md_i=0
+  while [ "$md_i" -lt 20 ]; do
+    sleep 0.5
+    try mv "$1" "$2" && return 0
+    md_i=$((md_i + 1))
+  done
+  ERR="$ERR (a running app may have it open, Antigravity for example: quit it and run setup again)"
+  return 1
+}
+
 # is_checkout DIR: DIR is a ystack checkout (has this script and the ystack marketplace file).
 is_checkout() {
   [ -f "$1/setup" ] && [ -f "$1/.claude-plugin/marketplace.json" ] &&
@@ -217,11 +239,13 @@ entry_kind() {
   e="$1"; en="$(basename "$e")"
   if [ -L "$e" ]; then
     raw="$(readlink "$e" 2>/dev/null || true)"; raw="${raw%/}"
-    case "$raw" in "$YSTACK_DIR/skills/$en") echo link; return ;; esac
+    case "$raw" in "$YSTACK_DIR/$SRC_SUB/$en") echo link; return ;; esac
     t="$(cd -P "$e" 2>/dev/null && pwd -P)" || { echo foreign; return; }
     if [ "$(basename "$t")" != "$en" ]; then echo foreign; return; fi
-    case "$t" in "$YSTACK_DIR/skills/$en") echo link; return ;; esac
-    if [ "$(basename "$(dirname "$t")")" = skills ] && is_checkout "$(dirname "$(dirname "$t")")"; then echo link; else echo foreign; fi
+    case "$t" in "$YSTACK_DIR/$SRC_SUB/$en") echo link; return ;; esac
+    # A link into another ystack checkout's own $SRC_SUB folder is ystack's too.
+    case "$t" in */"$SRC_SUB/$en") if is_checkout "${t%/"$SRC_SUB/$en"}"; then echo link; return; fi ;; esac
+    echo foreign
   elif [ -d "$e" ] && [ -f "$e/$MARKER" ] && [ "$(marker_get "$e" skill)" = "$en" ]; then
     echo copy
   elif [ -e "$e" ]; then
@@ -236,9 +260,9 @@ from_this_checkout() {
   en="$(basename "$1")"
   if [ "$2" = link ]; then
     ftc_raw="$(readlink "$1" 2>/dev/null || true)"
-    [ "${ftc_raw%/}" != "$YSTACK_DIR/skills/$en" ] || return 0
+    [ "${ftc_raw%/}" != "$YSTACK_DIR/$SRC_SUB/$en" ] || return 0
     t="$(cd -P "$1" 2>/dev/null && pwd -P)" || return 1
-    [ "$t" = "$YSTACK_DIR/skills/$en" ]
+    [ "$t" = "$YSTACK_DIR/$SRC_SUB/$en" ]
     return
   fi
   [ "$(marker_get "$1" source)" = "$YSTACK_DIR" ]
@@ -281,7 +305,7 @@ delete_tree() {
 retire_entry() {
   if [ "$2" = link ]; then try rm -f "$1"; return; fi
   re_aside="$(dirname "$1")/.ystack-old-$(basename "$1").$$"
-  try mv "$1" "$re_aside" || return 1
+  mv_dir "$1" "$re_aside" || return 1
   delete_tree "$re_aside" ||
     { ERR="moved aside to $(pretty "$re_aside") but could not delete it ($ERR); the next run retries"; return 1; }
 }
@@ -356,7 +380,7 @@ SKILL_NAMES="${SKILL_NAMES# }"
 
 install_skill() { # HOST TARGET NAME
   host="$1"; target="$2"; name="$3"
-  src="$YSTACK_DIR/skills/$name"
+  src="$YSTACK_DIR/$SRC_SUB/$name"
   dst="$target/$name"
   if [ -e "$dst" ]; then
     is_rd="$(cd -P "$dst" 2>/dev/null && pwd -P || true)"
@@ -414,7 +438,8 @@ install_skill() { # HOST TARGET NAME
     return
   fi
   try mkdir -p "$target" || { note_fail "$name" "could not create $(pretty "$target"): $ERR"; return; }
-  stage_entry "$src" "$target" "$name" || { note_fail "$name" "$ERR; left $(pretty "$dst") as it was"; return; }
+  try mkdir -p "${STAGE_DIR:-$target}" || { note_fail "$name" "could not create $(pretty "${STAGE_DIR:-$target}"): $ERR"; return; }
+  stage_entry "$src" "${STAGE_DIR:-$target}" "$name" || { note_fail "$name" "$ERR; left $(pretty "$dst") as it was"; return; }
   # Clear the old entry. On any failure, drop the staged entry and leave the old one in place.
   aside=""; backup=""
   case "$how" in
@@ -422,8 +447,8 @@ install_skill() { # HOST TARGET NAME
       if [ "$kind" = link ]; then
         try rm -f "$dst" || { discard_stage; note_fail "$name" "could not remove the old link: $ERR"; return; }
       else
-        aside="$target/.ystack-old-$name.$$"
-        try mv "$dst" "$aside" || { discard_stage; note_fail "$name" "could not move the old copy aside: $ERR; left it as it was"; return; }
+        aside="${STAGE_DIR:-$target}/.ystack-old-$name.$$"
+        mv_dir "$dst" "$aside" || { discard_stage; note_fail "$name" "could not move the old copy aside: $ERR; left it as it was"; return; }
       fi ;;
     backup)
       backup_entry "$dst" "$host/$name" ||
@@ -433,7 +458,7 @@ install_skill() { # HOST TARGET NAME
   if [ -e "$dst" ] || [ -L "$dst" ]; then
     discard_stage; note_fail "$name" "$(pretty "$dst") is still there; nothing replaced"; return
   fi
-  if ! try mv "$STAGED" "$dst"; then
+  if ! mv_dir "$STAGED" "$dst"; then
     is_err="$ERR"; discard_stage
     if [ -n "$aside" ]; then mv "$aside" "$dst" 2>/dev/null || true; fi
     if [ -n "$backup" ]; then mv "$backup" "$dst" 2>/dev/null || true; fi
@@ -488,7 +513,7 @@ clean_leftovers() {
     [ -e "$lo" ] || [ -L "$lo" ] || continue
     lo_n="$(basename "$lo")"
     if [ -L "$lo" ]; then
-      case "$(readlink "$lo" 2>/dev/null || true)" in "$YSTACK_DIR"/skills/*) ;; *) note_skip "$lo_n: leftover from an interrupted run, not ystack's; delete it by hand if you don't need it"; continue ;; esac
+      case "$(readlink "$lo" 2>/dev/null || true)" in "$YSTACK_DIR/$SRC_SUB"/*) ;; *) note_skip "$lo_n: leftover from an interrupted run, not ystack's; delete it by hand if you don't need it"; continue ;; esac
       if [ "$DRY" -eq 1 ]; then say "  $lo_n: would remove (left by an interrupted run)"; continue; fi
       try rm -f "$lo" || { note_fail "$lo_n" "could not remove it: $ERR"; continue; }
     elif [ -f "$lo/$MARKER" ] && [ "$(marker_get "$lo" source)" = "$YSTACK_DIR" ]; then
@@ -507,11 +532,12 @@ is_temp_name() { case "$1" in .ystack-new-*|.ystack-old-*) return 0 ;; esac; ret
 prune_host() { # TARGET: remove this checkout's entries whose skill is gone from ystack
   [ -d "$1" ] || return 0
   clean_leftovers "$1"
+  [ -z "${STAGE_DIR:-}" ] || [ ! -d "$STAGE_DIR" ] || clean_leftovers "$STAGE_DIR"
   for e in "$1"/* "$1"/.[!.]*; do
     [ -e "$e" ] || [ -L "$e" ] || continue
     n="$(basename "$e")"
     ! is_temp_name "$n" || continue
-    [ -f "$YSTACK_DIR/skills/$n/SKILL.md" ] && continue
+    [ -f "$YSTACK_DIR/$SRC_SUB/$n/$SRC_FILE" ] && continue
     k="$(entry_kind "$e")"
     case "$k" in link|copy) ;; *) continue ;; esac
     from_this_checkout "$e" "$k" || continue
@@ -522,6 +548,7 @@ prune_host() { # TARGET: remove this checkout's entries whose skill is gone from
 uninstall_host() { # TARGET
   [ -d "$1" ] || return 0
   clean_leftovers "$1"
+  [ -z "${STAGE_DIR:-}" ] || [ ! -d "$STAGE_DIR" ] || clean_leftovers "$STAGE_DIR"
   for e in "$1"/* "$1"/.[!.]*; do
     [ -e "$e" ] || [ -L "$e" ] || continue
     n="$(basename "$e")"
@@ -551,29 +578,53 @@ host_summary() { # LABEL TARGET
 
 [ "$DRY" -eq 0 ] || say "Dry run: nothing will change."
 
-for h in $HOSTS; do
-  cur_host="$h"
-  target="$(host_home "$h")/skills"
+# sync_folder KEY TARGET LABEL WHAT NAMES: install NAMES (from $YSTACK_DIR/$SRC_SUB) into TARGET and
+# prune what's gone, or with --uninstall remove ystack's entries. KEY names the backup subfolder.
+sync_folder() {
+  cur_host="$1"; sf_target="$2"; sf_label="$3"; sf_what="$4"; sf_names="$5"
   reset_counts
-  # A skills folder that resolves into this checkout (say, linked by hand to ~/ystack/skills) is
-  # the checkout itself: installing or pruning there would move ystack's own files.
-  rt="$(resolve_path "$target")"
+  # A folder that resolves into this checkout (say, linked by hand to ~/ystack/skills) is the
+  # checkout itself: installing or pruning there would move ystack's own files.
+  rt="$(resolve_path "$sf_target")"
   case "$rt/" in
     "$YSTACK_DIR"/*)
-      say "$(host_label "$h"): $(pretty "$target") is inside this checkout ($(pretty "$rt")); skipped"
-      add_summary "  $(host_label "$h") ($(pretty "$target")): skipped, it resolves to $(pretty "$rt"), inside this checkout. Setup won't install into its own folder."
-      continue ;;
+      say "$sf_label: $(pretty "$sf_target") is inside this checkout ($(pretty "$rt")); skipped"
+      add_summary "  $sf_label ($(pretty "$sf_target")): skipped, it resolves to $(pretty "$rt"), inside this checkout. Setup won't install into its own folder."
+      return ;;
   esac
   if [ "$UNINSTALL" -eq 1 ]; then
-    say "$(host_label "$h"): removing ystack skills from $(pretty "$target")"
-    uninstall_host "$target"
+    say "$sf_label: removing ystack $sf_what from $(pretty "$sf_target")"
+    uninstall_host "$sf_target"
   else
-    say "$(host_label "$h"): $(pretty "$target") ($MODE mode)"
-    if [ -z "$SKILL_NAMES" ]; then say "  no skills found in $(pretty "$YSTACK_DIR")/skills"; fi
-    for name in $SKILL_NAMES; do install_skill "$h" "$target" "$name"; done
-    prune_host "$target"
+    say "$sf_label: $(pretty "$sf_target") ($MODE mode)"
+    if [ -z "$sf_names" ]; then say "  no $sf_what found in $(pretty "$YSTACK_DIR/$SRC_SUB")"; fi
+    for name in $sf_names; do install_skill "$cur_host" "$sf_target" "$name"; done
+    prune_host "$sf_target"
   fi
-  host_summary "$(host_label "$h")" "$target"
+  host_summary "$sf_label" "$sf_target"
+}
+
+# Antigravity plugins (antigravity/plugins/<name>/plugin.json) go to ~/.gemini/config/plugins, under
+# the same ownership and marker rules as skills.
+PLUGIN_NAMES=""
+for f in "$YSTACK_DIR"/antigravity/plugins/*/plugin.json; do
+  [ -f "$f" ] || continue
+  PLUGIN_NAMES="$PLUGIN_NAMES $(basename "$(dirname "$f")")"
+done
+PLUGIN_NAMES="${PLUGIN_NAMES# }"
+
+STAGE_DIR="" # where new copies are built before they move into place; empty: next to them
+for h in $HOSTS; do
+  SRC_SUB="skills"; SRC_FILE="SKILL.md"
+  sync_folder "$h" "$(host_home "$h")/skills" "$(host_label "$h")" skills "$SKILL_NAMES"
+  if [ "$h" = antigravity ]; then
+    # Antigravity holds every folder inside plugins/ open while it runs, so a copy staged there can't be
+    # renamed into place: plugin copies are staged one level up, in ~/.gemini/config/.ystack-stage.
+    SRC_SUB="antigravity/plugins"; SRC_FILE="plugin.json"; STAGE_DIR="$(host_home "$h")/.ystack-stage"
+    sync_folder antigravity-plugins "$(host_home "$h")/plugins" "Antigravity plugins" plugins "$PLUGIN_NAMES"
+    SRC_SUB="skills"; SRC_FILE="SKILL.md"; STAGE_DIR=""
+    rmdir "$(host_home "$h")/.ystack-stage" 2>/dev/null || true
+  fi
 done
 
 # ---- agents (Claude Code only) ----

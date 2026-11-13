@@ -1,0 +1,10 @@
+{
+  "name": "ystack-guards",
+  "displayName": "ystack guards",
+  "version": "0.1.0",
+  "description": "Three guards for the agent: stops pushes that carry keys, making a repo public and force-pushes to main or master; checks packages on their registry before an install; and asks once for a real check before the agent finishes after editing code.",
+  "author": { "name": "ychampion" },
+  "license": "MIT",
+  "repository": "https://github.com/ychampion/ystack",
+  "keywords": ["guard", "git", "secrets", "packages", "verify"]
+}
