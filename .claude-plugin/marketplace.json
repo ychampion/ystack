@@ -6,6 +6,10 @@
   "description": "ystack: Claude Code mods that turn agent house rules into enforced hooks (guards, delegation, long sessions, learning, cost, owner view, design).",
   "plugins": [
     {
+      "name": "ystack",
+      "source": "./claude/bundle"
+    },
+    {
       "name": "iron-rules",
       "source": "./claude/mods/iron-rules"
     },

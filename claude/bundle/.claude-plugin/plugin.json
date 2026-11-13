@@ -1,0 +1,43 @@
+{
+  "name": "ystack",
+  "version": "0.1.0",
+  "description": "Installs every ystack mod for Claude Code in one go. Uninstall any single mod afterwards if you don't want it.",
+  "author": {
+    "name": "ychampion"
+  },
+  "dependencies": [
+    "iron-rules",
+    "verify",
+    "brief-linter",
+    "assumptions-ledger",
+    "decision-inbox",
+    "spec-sharpener",
+    "review-panel",
+    "context-meter",
+    "memory-recall",
+    "auto-claudeception",
+    "night-shift",
+    "session-recovery",
+    "codex-ladder",
+    "package-bouncer",
+    "vault",
+    "slop-guard",
+    "loop-breaker",
+    "lanes",
+    "keep-going",
+    "operator-context",
+    "prompt-diet",
+    "output-diet",
+    "pin",
+    "owner-view",
+    "user-voice",
+    "twins",
+    "ystack-stats",
+    "ystack-setup",
+    "push-guard",
+    "model-router",
+    "session-board",
+    "weekly-digest",
+    "model-checkup"
+  ]
+}

@@ -6,7 +6,64 @@ On one heavy user's logs, it cut usage about 78% per hour of work and 39% per AP
 
 > **Early version (0.1).** It works and is used daily, but expect frequent changes: broader host support, more mods and new skill packs are on the way. Issues and requests are welcome. [Changelog](CHANGELOG.md).
 
-## Install
+## Install for Claude Code: everything, one line
+
+At the prompt of a Claude Code terminal session:
+
+```text
+/plugin install ystack --marketplace ychampion/ystack
+```
+
+Or from a shell:
+
+```bash
+claude plugin install ystack --marketplace ychampion/ystack
+```
+
+This adds the `ystack` marketplace and installs all 33 mods. Restart Claude Code (or run `/reload-plugins`) to load them. Don't want one of them? `claude plugin uninstall <mod>` removes just that one. Mods with settings show a settings screen during install; change them later in `/config`.
+
+Then run `/ystack-stats` to see what ystack would have saved on your last two weeks of logs, and `/ystack-setup` to walk through the recommended settings. Nothing changes until you Apply.
+
+In the Claude desktop app's Code tab, `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `ychampion/ystack`, then Add plugin. A mod installed from a terminal at user scope also loads in the desktop app's local Code sessions. Mods run inside Claude Code; they don't run in claude.ai chat, and cloud sessions need their own installation.
+
+## Or pick the mods you want
+
+```text
+/plugin install <mod> --marketplace ychampion/ystack
+```
+
+| Group | Mods |
+| --- | --- |
+| Start here | `ystack-stats` (your savings, from your own logs) · `ystack-setup` (recommended settings, one click each) · `model-checkup` (suggests `/doctor prompt-audit` on a model you haven't used before) |
+| Guards | `push-guard` (keys in pushes, repos made public, force-pushes) · `verify` (no "done" without a real check) · `package-bouncer` (hallucinated or brand-new packages) · `vault` (API keys Claude uses but never sees) · `iron-rules` (your house rules on every shell call) · `slop-guard` (AI-made design tells) · `codex-ladder` (Codex effort ladder) |
+| Delegation | `model-router` (right model and effort per subagent) · `decision-inbox` (agents keep going while your decisions wait) · `brief-linter` (complete subagent briefs) · `assumptions-ledger` (checks what subagents assumed) · `spec-sharpener` (pointed questions before big builds) · `review-panel` (parallel specialist review) |
+| Long sessions | `context-meter` (handoffs and compaction at the right time) · `session-board` (every session on one board) · `session-recovery` (reopen sessions after a crash or restart) · `night-shift` (unattended task queue) · `loop-breaker` (stops going in circles) · `lanes` (several sessions, one repo) · `pin` (rules that survive compaction) · `keep-going` (no needless "want me to continue?") |
+| Cost | `prompt-diet` (what every turn sends) · `output-diet` (shorter build and test output) |
+| For the owner | `owner-view` (plain-English captions, `/brief-me`) · `user-voice` (what users said, on feature requests) · `operator-context` (your profile as facts) · `twins` (copies that fall behind) · `weekly-digest` (your week per repo) |
+| Learning | `memory-recall` (past fixes on a failing tool call) · `auto-claudeception` (saves what a debugging session learned) |
+
+Each mod is independent. What each one does, with its settings: [`claude/README.md`](claude/README.md).
+
+## Update
+
+Turn on auto-update once: `/plugin`, then Marketplaces, `ystack`, Enable auto-update. Claude Code then keeps the marketplace and every installed mod current.
+
+Or update by hand:
+
+```bash
+claude plugin marketplace update ystack
+claude plugin update <mod>@ystack
+```
+
+To update every installed ystack mod at once (bash):
+
+```bash
+claude plugin marketplace update ystack && for m in $(claude plugin list | grep -o '[a-z0-9-]*@ystack'); do claude plugin update "$m"; done
+```
+
+Restart Claude Code after an update to load the new versions.
+
+## Skills for Claude Code, Codex and OpenCode
 
 ```bash
 git clone https://github.com/ychampion/ystack.git ~/ystack && ~/ystack/setup
@@ -30,32 +87,10 @@ The starter mods are `ystack-stats`, `ystack-setup`, `context-meter`, `verify`, 
 
 After setup:
 
-- Run `/ystack-stats` to replay your last two weeks of logs under ystack's rules and see the potential savings on day one, before changing your settings.
-- Run `/ystack-setup` to walk through the recommended Claude Code settings. Nothing changes until you Apply.
 - Copy or merge [`claude/CLAUDE.starter.md`](claude/CLAUDE.starter.md) into `~/.claude/CLAUDE.md`. It holds the working rules and names the mod that enforces each one. Setup doesn't install it.
 - Start each `codex exec` brief from [`codex/briefs/brief-template.md`](codex/briefs/brief-template.md).
 
 Later, `/ystack-upgrade` pulls, re-runs setup for the same hosts, and updates installed mods.
-
-## Install one Claude Code mod
-
-At the prompt of a Claude Code terminal session:
-
-```text
-/plugin install <mod> --marketplace ychampion/ystack
-```
-
-Answer `y` to add the marketplace, then pick a scope. User scope loads the mod in every session. Mods with settings show a settings screen during install; change them later in `/config`.
-
-From a shell:
-
-```bash
-claude plugin install <mod> --marketplace ychampion/ystack
-```
-
-In the Claude desktop app's Code tab, `/plugin` does not run. Click + next to the prompt box, then Plugins, Add marketplace with `ychampion/ystack`, then Add plugin. A mod installed from a terminal at user scope also loads in the desktop app's local Code sessions.
-
-Mods run inside Claude Code. They don't run in claude.ai chat, and cloud sessions need their own installation. See [`claude/README.md`](claude/README.md) for the mods and what each does.
 
 ## What's included
 

@@ -2,6 +2,14 @@
 
 Mods are Claude Code plugins built from function hooks: they sit on tool calls, prompts, subagent turns and the UI, so a rule is enforced, not just written in CLAUDE.md and hoped for. Each mod is independent; install only the ones you want.
 
+All of them, in one line:
+
+```
+/plugin install ystack --marketplace ychampion/ystack
+```
+
+Or one at a time:
+
 ```
 /plugin install <mod> --marketplace ychampion/ystack
 ```

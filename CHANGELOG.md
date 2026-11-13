@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 33 mods in one go.
+- README: install everything first, then a grouped list of the mods to pick from, and how to update (auto-update or by hand).
+
 ## 0.1.0 (2026-11-14): first public release
 
 An early version. Expect frequent updates: broader host support, more mods, and new skill packs.
