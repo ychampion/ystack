@@ -14,6 +14,7 @@ In the desktop app's Code tab: + next to the prompt box → Plugins → Add mark
 | --- | --- | --- |
 | `ystack-stats` | Shows what ystack saves, from your own logs, on day one. `/ystack-stats` re-prices your last two weeks of real API calls under ystack's handoff and compaction rules (on one heavy user's logs: 15% less), and once you've used ystack a few days it compares real usage per active hour before and after you installed it. Logs are read locally and cached; `/ystack-stats share` gives a paste-ready summary with numbers only. | `days` (14) |
 | `ystack-setup` | A checklist of the Claude Code settings that measured well: compaction windows, two subagent types that compact at 250k, agent teams off, a default subagent model. Each item says what changes, why, the measured gain, and whether you already have it. Nothing changes until you tick and press Apply; every file is backed up and Undo puts it back. `/ystack-setup check` prints the same for scripts. Why each one: [docs/settings.md](docs/settings.md). | `haikuModel` |
+| `model-checkup` | The first time you use a model you haven't used before, suggests `/doctor prompt-audit` (Tab to take it), Claude Code's own check of your CLAUDE.md, skills and agents for wording that works against that model. Once per model; running the audit yourself counts. | — |
 
 Measured write-ups behind the mods are in [docs/](docs/).
 

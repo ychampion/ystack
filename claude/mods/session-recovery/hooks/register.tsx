@@ -12,6 +12,8 @@ let isWindows = false
 let title = ''
 let startedAt = 0
 let isInteractive = true
+// This session announced the restart: only it shows the band, and only until the person's next prompt.
+let announcing = false
 
 async function setup($: EngineInterface) {
   const win = await $.env.get('USERPROFILE')
@@ -86,13 +88,13 @@ async function reopen($: EngineInterface, list: readonly RecoverRow[]): Promise<
   if (isWindows) {
     const r = await $.process.run(wtArgv(recs), { timeoutMs: 30_000 }).catch((err: unknown) => ({ exitCode: -1, stdout: '', stderr: String(err) }))
     if (r.exitCode !== 0) {
-      await $.prompt.fill({ text: recs.map(resumeLine).join('\n'), mode: 'replace' })
+      await $.prompt.fill({ text: recs.map(r => resumeLine(r, isWindows)).join('\n'), mode: 'replace' })
       return `Windows Terminal did not start (${r.stderr.trim().slice(0, 120)}). The resume commands are in your prompt box.`
     }
   } else if (await $.env.get('TMUX')) {
     for (const r of recs) await $.process.run(['tmux', 'new-window', '-c', r.cwd, '-n', projectOf(r.cwd), `claude --resume ${r.id}`], { timeoutMs: 15_000 }).catch(() => undefined)
   } else {
-    await $.prompt.fill({ text: recs.map(resumeLine).join('\n'), mode: 'replace' })
+    await $.prompt.fill({ text: recs.map(r => resumeLine(r, isWindows)).join('\n'), mode: 'replace' })
     return 'No Windows Terminal or tmux here: the resume commands are in your prompt box.'
   }
   for (const r of list) await remove($, r.id) // each resumed session records itself again
@@ -119,6 +121,8 @@ export const register: Register = on => {
       const boot = Math.min(...killed.map(r => r.lastBeat))
       if ((await $.store.get('handledBoot')) === boot) return
       await $.store.set('handledBoot', boot)
+      announcing = true
+      await update($, rows, l => [...l]) // draw the band
       if ((await $.store.get('auto')) === true) {
         $.ui.toast(await reopen($, killed), { timeoutMs: 8000 })
         return
@@ -132,7 +136,12 @@ export const register: Register = on => {
 
   // The first thing the person asks names the session in the list.
   on('prompt.submit', async ($, e, next) => {
-    if (!title && (e.origin.kind === 'composer' || e.origin.kind === 'bridge') && !e.command) title = e.text.slice(0, 60)
+    const typed = e.origin.kind === 'composer' || e.origin.kind === 'bridge'
+    if (!title && typed && !e.command) title = e.text.slice(0, 60)
+    if (announcing && typed) {
+      announcing = false // seen it; /recover still lists them
+      await update($, rows, l => [...l])
+    }
     return next(e)
   })
 
@@ -160,7 +169,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const n = (await read($, rows)).filter(r => r.isFromBeforeBoot).length
-    if (e.props.hasSurvey || n === 0) return next(e)
+    if (!announcing || e.props.hasSurvey || n === 0) return next(e)
     const { Text } = $.ui.resolve(e)
     return <Text color="warning">recover: {n} session{n > 1 ? 's' : ''} from before the restart (/recover)</Text>
   })

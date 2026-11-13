@@ -59,7 +59,7 @@ Mods run inside Claude Code. They don't run in claude.ai chat, and cloud session
 
 | Folder | For | Status |
 | --- | --- | --- |
-| [`claude/`](claude/) | Claude Code | 32 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
+| [`claude/`](claude/) | Claude Code | 33 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
 | [`skills/`](skills/) | Claude Code, Codex, OpenCode, and other agents that read skills | 16 skills: design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
 | [`codex/`](codex/) | Codex CLI | A brief template for unattended `codex exec` runs; pairs with the `codex-ladder` mod |
 | [`ops/`](ops/) | Any Linux server | `security-sweep`: a weekly scan of OS packages, repos, and containers that installs only restart-free security patches and reports the rest |

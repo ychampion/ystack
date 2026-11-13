@@ -132,6 +132,10 @@
     {
       "name": "weekly-digest",
       "source": "./claude/mods/weekly-digest"
+    },
+    {
+      "name": "model-checkup",
+      "source": "./claude/mods/model-checkup"
     }
   ]
 }

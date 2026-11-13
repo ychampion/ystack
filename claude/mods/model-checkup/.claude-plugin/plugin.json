@@ -1,0 +1,6 @@
+{
+  "name": "model-checkup",
+  "version": "0.1.0",
+  "description": "The first time you use a model you haven't used before, suggests /doctor prompt-audit, which checks your CLAUDE.md, skills and agents for wording that works against that model.",
+  "author": { "name": "ychampion" }
+}

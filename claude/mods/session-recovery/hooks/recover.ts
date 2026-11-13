@@ -13,6 +13,9 @@ export type Rec = {
 export const BEAT_MS = 2 * 60_000
 export const ALIVE_MS = 5 * 60_000 // a beat this recent means the session is still running somewhere
 export const KEEP_MS = 7 * 24 * 60 * 60_000
+// Killed by this restart: still beating shortly before the boot. One that died days earlier was offered after an
+// earlier boot already; it stays in /recover but isn't announced again.
+export const KILLED_MS = 30 * 60_000
 
 export type Candidate = Rec & { isFromBeforeBoot: boolean }
 
@@ -20,7 +23,7 @@ export type Candidate = Rec & { isFromBeforeBoot: boolean }
 export function candidates(recs: readonly Rec[], now: number, bootAt: number | undefined, selfId: string): Candidate[] {
   return recs
     .filter(r => r.id !== selfId && !r.ended && r.isInteractive && now - r.lastBeat > ALIVE_MS && now - r.lastBeat < KEEP_MS)
-    .map(r => ({ ...r, isFromBeforeBoot: bootAt !== undefined && r.lastBeat < bootAt }))
+    .map(r => ({ ...r, isFromBeforeBoot: bootAt !== undefined && r.lastBeat < bootAt && bootAt - r.lastBeat < KILLED_MS }))
     .sort((a, b) => Number(b.isFromBeforeBoot) - Number(a.isFromBeforeBoot) || b.lastBeat - a.lastBeat)
 }
 
@@ -36,8 +39,13 @@ export function wtArgv(recs: readonly Rec[]): string[] {
   return argv
 }
 
-export function resumeLine(r: Rec): string {
-  return `cd "${r.cwd}" && claude --resume ${r.id}`
+/**
+ * A line that reopens one session from a shell. Windows PowerShell 5.1 has no `&&`, so on Windows the two steps are
+ * joined with `;`. Single quotes keep `$` and backticks in the folder name literal.
+ */
+export function resumeLine(r: Rec, isWindows: boolean): string {
+  if (isWindows) return `Set-Location -LiteralPath '${r.cwd.replace(/'/g, "''")}'; claude --resume ${r.id}`
+  return `cd '${r.cwd.replace(/'/g, "'\\''")}' && claude --resume ${r.id}`
 }
 
 export function ago(ms: number): string {
