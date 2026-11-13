@@ -114,7 +114,7 @@ export const register: Register = on => {
           return { text: `queue: night shift starts at ${arg}. Keep this session open (an always-on machine is best).` }
         }
         await set($, x => ({ ...x, isActive: true, note: undefined }))
-        void startNext($)
+        $.clock.after(0, () => void startNext($)) // after the command returns: a submit from inside it is refused
         return { text: 'queue: night shift started.' }
       }
       case 'stop':

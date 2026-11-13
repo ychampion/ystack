@@ -1,0 +1,6 @@
+{
+  "name": "code-threads",
+  "version": "0.1.0",
+  "description": "Traces code back to the Claude conversation that wrote it. Each commit Claude makes is linked, on your machine only, to the prompts that asked for it and the reasoning behind it; /why <file:line> and a tool the model can call bring that back. Nothing goes into git history.",
+  "author": { "name": "ychampion" }
+}

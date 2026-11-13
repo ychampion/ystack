@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `review-panel` 0.1.1: `/review-panel` answered "no command.run hook answered it" and queued nothing; it now queues the panel right after the command returns. `night-shift` 0.1.1: `/queue start` (with no time) silently never started; same fix.
+- New mod `code-threads`: `/why <file:line>` traces code back to the Claude conversation that wrote it (what was asked, the reasoning, the session to reopen); Claude can call it as a tool too. Links are kept on your machine, never in git history.
 - Headless support (`claude -p`, the Agent SDK, harnesses such as T3 Code): `context-meter` starts no turns or compactions of its own there, and `model-checkup` saves its one-time reminder for an interactive session. Checked with a real `claude -p` run.
 - `./setup` installs the skills into Antigravity (Google's agent app and its `agy` CLI, on Gemini models): found automatically, or `--host antigravity` / `--host agy`.
 - Long-sessions doc: how the one-hour cache cliff differs from compaction.

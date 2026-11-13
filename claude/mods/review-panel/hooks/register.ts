@@ -39,7 +39,9 @@ export const register: Register = on => {
 
     if (files.length === 0) return { text: `review-panel: nothing to review in ${scope}.` }
     const panel = pickPanel(files)
-    await $.prompt.submit({ text: panelPrompt(scope, files, panel) })
+    // Not from inside the command: the engine refuses a submit that would wait under the turn this hook holds.
+    const text = panelPrompt(scope, files, panel)
+    $.clock.after(0, () => void $.prompt.submit({ text }).catch(() => undefined))
     return { text: `review-panel: ${panel.length} reviewers queued for ${scope} (${files.length} files).` }
   })
 }

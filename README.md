@@ -20,7 +20,7 @@ Or from a shell:
 claude plugin install ystack --marketplace ychampion/ystack
 ```
 
-This adds the `ystack` marketplace and installs all 33 mods plus the `self-learning` plugin. Restart Claude Code (or run `/reload-plugins`) to load them. Don't want one of them? `claude plugin uninstall <mod>` removes just that one. Mods with settings show a settings screen during install; change them later in `/config`.
+This adds the `ystack` marketplace and installs all 34 mods plus the `self-learning` plugin. Restart Claude Code (or run `/reload-plugins`) to load them. Don't want one of them? `claude plugin uninstall <mod>` removes just that one. Mods with settings show a settings screen during install; change them later in `/config`.
 
 Then run `/ystack-stats` to see what ystack would have saved on your last two weeks of logs, and `/ystack-setup` to walk through the recommended settings. Nothing changes until you Apply.
 
@@ -40,7 +40,7 @@ In the Claude desktop app's Code tab, `/plugin` does not run: click + next to th
 | Long sessions | `context-meter` (handoffs and compaction at the right time) · `session-board` (every session on one board) · `session-recovery` (reopen sessions after a crash or restart) · `night-shift` (unattended task queue) · `loop-breaker` (stops going in circles) · `lanes` (several sessions, one repo) · `pin` (rules that survive compaction) · `keep-going` (no needless "want me to continue?") |
 | Cost | `prompt-diet` (what every turn sends) · `output-diet` (shorter build and test output) |
 | For the owner | `owner-view` (plain-English captions, `/brief-me`) · `user-voice` (what users said, on feature requests) · `operator-context` (your profile as facts) · `twins` (copies that fall behind) · `weekly-digest` (your week per repo) |
-| Learning | `self-learning` (`/learn <topic>`: researches a technology's docs and writes a reusable skill) · `memory-recall` (past fixes on a failing tool call) · `auto-claudeception` (saves what a debugging session learned) |
+| Learning | `code-threads` (`/why <file:line>`: the Claude conversation that wrote that code, what was asked and why) · `self-learning` (`/learn <topic>`: researches a technology's docs and writes a reusable skill) · `memory-recall` (past fixes on a failing tool call) · `auto-claudeception` (saves what a debugging session learned) |
 
 Each mod is independent. What each one does, with its settings: [`claude/README.md`](claude/README.md).
 
@@ -102,7 +102,7 @@ Later, `/ystack-upgrade` pulls, re-runs setup for the same hosts, and updates in
 
 | Folder | For | Status |
 | --- | --- | --- |
-| [`claude/`](claude/) | Claude Code | 33 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
+| [`claude/`](claude/) | Claude Code | 34 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
 | [`skills/`](skills/) | Claude Code, Codex, OpenCode, Antigravity (Gemini models, in the app and the `agy` CLI), and other agents that read skills | 20 skills: engineering workflow (`blast-radius`, `interrogate`, `arena`, `recall`), design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
 | [`codex/`](codex/) | Codex CLI | A brief template for unattended `codex exec` runs; pairs with the `codex-ladder` mod |
 | [`ops/`](ops/) | Any Linux server | `security-sweep`: a weekly scan of OS packages, repos, and containers that installs only restart-free security patches and reports the rest |
