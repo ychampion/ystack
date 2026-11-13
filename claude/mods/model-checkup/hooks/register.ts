@@ -4,6 +4,8 @@ import { AUDIT, isAudit, isNew, modelKey, remember } from './checkup'
 
 // Models reminded about (or audited), kept across sessions: each model is mentioned once, ever.
 const SEEN = 'seen'
+// Headless (claude -p, an SDK host): nobody sees a suggestion there, so it must not use up the one reminder.
+let interactive = true
 
 async function seen($: EngineInterface): Promise<string[]> {
   const v = await $.store.get(SEEN)
@@ -23,14 +25,15 @@ async function check($: EngineInterface): Promise<void> {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    if (e.isInteractive) void check($)
+    interactive = e.isInteractive
+    if (interactive) void check($)
     return started
   })
 
   // A /model switch has no event of its own: look again when a turn ends, the moment a suggestion is shown.
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    if (e.agentId === undefined) await check($)
+    if (interactive && e.agentId === undefined) await check($)
     return done
   })
 

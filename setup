@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# ystack setup: install ystack's skills for your agent hosts (Claude Code, Codex, OpenCode),
+# ystack setup: install ystack's skills for your agent hosts (Claude Code, Codex, OpenCode,
+# Antigravity),
 # and on request its Claude Code subagent types and a starter set of mods.
 #
 # Works in bash 3.2 (macOS), bash on Linux, and Git Bash on Windows. Keep it that way:
@@ -43,8 +44,9 @@ Usage: ./setup [options]
 
 Installs every skill in skills/ for your agent hosts. Re-run it to update.
 
-  --host <list>   claude, codex, opencode, all, or auto (default: auto = every host
-                  whose home folder exists). Comma-separate or repeat for several.
+  --host <list>   claude, codex, opencode, antigravity (or agy), all, or auto
+                  (default: auto = every host whose home folder exists).
+                  Comma-separate or repeat for several.
   --agents        Also install claude/agents/*.md into ~/.claude/agents (Claude Code only).
   --mods          Print the commands that add the ystack marketplace and install a
                   starter set of mods. With --yes, run them (needs the claude CLI).
@@ -59,6 +61,7 @@ Installs every skill in skills/ for your agent hosts. Re-run it to update.
 Skill folders:  Claude Code  ~/.claude/skills
                 Codex        ${CODEX_HOME:-~/.codex}/skills
                 OpenCode     ~/.config/opencode/skills
+                Antigravity  ~/.gemini/config/skills
 macOS and Linux get symlinks into this checkout; Windows gets copies (re-run after git pull).
 EOF
 }
@@ -76,7 +79,7 @@ QUIET=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --host) [ $# -ge 2 ] || die "--host needs a value (claude, codex, opencode, all, auto)"; HOSTS_ARG="$HOSTS_ARG,$2"; shift 2 ;;
+    --host) [ $# -ge 2 ] || die "--host needs a value (claude, codex, opencode, antigravity, all, auto)"; HOSTS_ARG="$HOSTS_ARG,$2"; shift 2 ;;
     --host=*) HOSTS_ARG="$HOSTS_ARG,${1#--host=}"; shift ;;
     --agents) DO_AGENTS=1; shift ;;
     --mods) DO_MODS=1; shift ;;
@@ -107,6 +110,15 @@ host_home() {
     claude) echo "$HOME/.claude" ;;
     codex) echo "${CODEX_HOME:-$HOME/.codex}" ;;
     opencode) echo "$HOME/.config/opencode" ;;
+    antigravity) echo "$HOME/.gemini/config" ;; # its global customization root; skills/ under it
+  esac
+}
+# The folder whose presence means the host is installed (auto mode). Antigravity (the app and its agy
+# CLI) keeps its state in ~/.gemini/antigravity; its skills root ~/.gemini/config may not exist yet.
+host_present() {
+  case "$1" in
+    antigravity) [ -d "$HOME/.gemini/antigravity" ] ;;
+    *) [ -d "$(host_home "$1")" ] ;;
   esac
 }
 host_label() {
@@ -114,15 +126,17 @@ host_label() {
     claude) echo "Claude Code" ;;
     codex) echo "Codex" ;;
     opencode) echo "OpenCode" ;;
+    antigravity) echo "Antigravity" ;;
   esac
 }
 
 want_claude=0
 want_codex=0
 want_opencode=0
+want_antigravity=0
 add_auto() {
-  for h in claude codex opencode; do
-    if [ -d "$(host_home "$h")" ]; then eval "want_$h=1"; fi
+  for h in claude codex opencode antigravity; do
+    if host_present "$h"; then eval "want_$h=1"; fi
   done
 }
 list="${HOSTS_ARG#,}"
@@ -131,24 +145,25 @@ old_ifs="$IFS"
 IFS=','
 for tok in $list; do
   case "$tok" in
-    claude|codex|opencode) eval "want_$tok=1" ;;
-    all) want_claude=1; want_codex=1; want_opencode=1 ;;
+    claude|codex|opencode|antigravity) eval "want_$tok=1" ;;
+    agy) want_antigravity=1 ;;
+    all) want_claude=1; want_codex=1; want_opencode=1; want_antigravity=1 ;;
     auto) add_auto ;;
     "") ;;
-    *) IFS="$old_ifs"; die "unknown host '$tok' (expected claude, codex, opencode, all or auto)" ;;
+    *) IFS="$old_ifs"; die "unknown host '$tok' (expected claude, codex, opencode, antigravity, all or auto)" ;;
   esac
 done
 IFS="$old_ifs"
 
 HOSTS=""
-for h in claude codex opencode; do
+for h in claude codex opencode antigravity; do
   eval "w=\$want_$h"
   if [ "$w" -eq 1 ]; then HOSTS="$HOSTS $h"; fi
 done
 HOSTS="${HOSTS# }"
 
 if [ -z "$HOSTS" ] && [ "$DO_MODS" -eq 0 ]; then
-  die "no agent host found (looked for ~/.claude, ${CODEX_HOME:-~/.codex}, ~/.config/opencode). Pass --host claude, codex or opencode to install anyway."
+  die "no agent host found (looked for ~/.claude, ${CODEX_HOME:-~/.codex}, ~/.config/opencode, ~/.gemini/antigravity). Pass --host claude, codex, opencode or antigravity to install anyway."
 fi
 
 # ---- link or copy ----

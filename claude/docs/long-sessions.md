@@ -94,6 +94,8 @@ Use them like this:
 
 The cache keeps your context for an hour. Come back after that, and the first call writes the whole context back at 2×. At 300k that's about 600k input-equivalents in a single call, before any work happens. Writing a handoff while the cache is still warm costs one cached read (about 30k worth) plus the document. The fresh conversation then starts small.
 
+**The cliff is not the same as compaction.** Claude Code's own auto-compaction is triggered by size: it runs when the context nears the compaction window, and never because time passed. So it doesn't protect you here. A 300k session left alone for an hour is still 300k when you come back, and the whole 300k is rewritten at 2× on your first call. Idle compaction is something else: `context-meter` acting on time. At 50 minutes idle, while the cache is still warm, it shrinks the context by compacting or handing off, so the rewrite after the hour is small. The cliff is the cost; idle compaction or idle handoff is how you avoid most of it. They also differ in timing: auto-compaction can run in the middle of your work, while idle compaction only runs while nobody is working.
+
 A handoff written *after* the hour pays that same 600k rewrite once, because writing it means reading the conversation. It still pays off if real work follows, since every later call is small. But the cheap moment is before the cache lapses.
 
 ### Idle compaction or idle handoff?

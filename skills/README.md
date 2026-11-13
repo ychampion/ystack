@@ -1,6 +1,6 @@
 # Skills
 
-Skills are folders with a `SKILL.md` that an agent loads when a task matches its description. Claude Code, Codex and OpenCode all read them, so these work in any of the three.
+Skills are folders with a `SKILL.md` that an agent loads when a task matches its description. Claude Code, Codex, OpenCode and Antigravity all read them, so these work in any of the four.
 
 Install them all with `./setup` from the root of this repo; it finds every folder here, so new skills need no installer change. See the root [README](../README.md#install).
 

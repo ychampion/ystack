@@ -12,6 +12,9 @@ let AUTO_HANDOFF = true
 type IdleAction = 'auto' | 'compact' | 'handoff'
 let IDLE_ACTION: IdleAction = 'auto'
 const OFF_IN_SETTINGS = 'turned off in settings'
+// claude -p and SDK hosts (harnesses such as T3 Code): a turn this mod started would show up in the host's
+// chat as a message nobody asked for, and the swap can't run there ($.session.compact rejects headless).
+const HEADLESS = 'headless (claude -p or an SDK host)'
 const IDLE_AT = 200_000 // below this, re-caching after a break costs little
 const IDLE_MS = 50 * 60_000 // the prompt cache lapses after 1h idle: reset while it is still warm
 const AWAY_MS = 15 * 60_000 // the user hasn't typed for this long: the session is running on its own
@@ -169,7 +172,7 @@ export const idleChoice = (s: { action: IdleAction; midTask: boolean; handoffsOn
 
 /** 50 minutes idle: compact or hand off while the cache is warm, so coming back doesn't rewrite the whole context at 2x. */
 async function idle($: EngineInterface): Promise<void> {
-  if (autoOff === OFF_IN_SETTINGS || asking !== undefined) return
+  if (autoOff === OFF_IN_SETTINGS || autoOff === HEADLESS || asking !== undefined) return
   const tokens = (await $.session.usage()).context.tokens ?? 0
   if (tokens < IDLE_AT) return
   const midTask = edited || cutShort
@@ -202,7 +205,8 @@ export const register: Register = (on, options) => {
   if (options.idleAction === 'compact' || options.idleAction === 'handoff') IDLE_ACTION = options.idleAction
 
   on('session.start', async ($, e, next) => {
-    if (!AUTO_HANDOFF) autoOff = OFF_IN_SETTINGS
+    if (!e.isInteractive) autoOff = HEADLESS // nothing of its own; /ctx still answers
+    if (!AUTO_HANDOFF && autoOff !== HEADLESS) autoOff = OFF_IN_SETTINGS
     await $.command.register({ name: 'handoff', description: 'Write the phase handoff and continue from it alone (no /clear; running agents keep reporting)' })
     await $.command.register({ name: 'ctx', description: 'Context size, usage limits and session cost, once' })
     $.ui.status(undefined) // clear the line an earlier version pinned
@@ -239,6 +243,7 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'ctx' }, async $ => ({ text: line(await $.session.usage()) }))
 
   on('command.run', { command: 'handoff' }, async $ => {
+    if (autoOff === HEADLESS) return { text: 'handoff: needs an interactive session; this one is headless (claude -p or an SDK host), where the conversation cannot be swapped.' }
     const busy = await checkpoint($, '', true)
     return { text: busy ?? 'handoff: writing it in one turn, then this conversation continues from it alone (no /clear needed).' }
   })
@@ -297,6 +302,7 @@ export const register: Register = (on, options) => {
       requested = false
       phaseEnded = false
       if (e.reason === 'aborted') return done // the user interrupted: they're here, let them decide
+      if (autoOff === HEADLESS) return done
       if (autoOff === 'a swap failed') {
         await $.ui.notify('Handoff requested from the session board, but a swap already failed in this session: run /clear and continue from the handoff file.', { title: 'context-meter' })
         return done

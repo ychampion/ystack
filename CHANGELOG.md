@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Headless support (`claude -p`, the Agent SDK, harnesses such as T3 Code): `context-meter` starts no turns or compactions of its own there, and `model-checkup` saves its one-time reminder for an interactive session. Checked with a real `claude -p` run.
+- `./setup` installs the skills into Antigravity (Google's agent app and its `agy` CLI, on Gemini models): found automatically, or `--host antigravity` / `--host agy`.
+- Long-sessions doc: how the one-hour cache cliff differs from compaction.
 - `self-learning` plugin joins ystack: `/learn <topic>` turns a technology's docs into a reusable skill. Its agents now use your session's model, skills are saved only where updates can't overwrite them, and its command metadata parses again.
 - Engineering workflow skills: `blast-radius`, `interrogate`, `arena`, `recall`.
 - `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 33 mods in one go.

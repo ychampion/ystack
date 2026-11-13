@@ -120,6 +120,18 @@ check "--host opencode installs there" is_ours "$H/.config/opencode/skills/beta"
 new_home codexhome
 OUT="$(HOME="$H" CODEX_HOME="$H/custom-codex" bash "$FX/setup" --host codex 2>&1)"
 check "CODEX_HOME is honoured" is_ours "$H/custom-codex/skills/alpha"
+section "Antigravity: found by ~/.gemini/antigravity, skills in ~/.gemini/config/skills"
+new_home agy .gemini/antigravity
+run "$FX"
+check "auto finds Antigravity" is_ours "$H/.gemini/config/skills/alpha"
+check "summary names Antigravity" has "Antigravity (~/.gemini/config/skills): 2 installed"
+new_home geminicli .gemini
+run "$FX"
+check "a bare ~/.gemini without antigravity/ is not Antigravity" sh -c '[ "$1" -ne 0 ] && [ ! -e "$2/.gemini/config" ]' _ "$RC" "$H"
+run "$FX" --host agy
+check "--host agy installs there" is_ours "$H/.gemini/config/skills/beta"
+run "$FX" --host antigravity --uninstall
+check "--uninstall removes them" sh -c '[ ! -e "$1/alpha" ] && [ ! -e "$1/beta" ]' _ "$H/.gemini/config/skills"
 new_home nohost
 run "$FX"
 check "no host found: non-zero exit with a hint" sh -c '[ "$1" -ne 0 ] && printf "%s" "$2" | grep -q -- "--host"' _ "$RC" "$OUT"

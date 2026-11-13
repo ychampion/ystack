@@ -7,7 +7,7 @@ type OnT = Parameters<TestBody>[1]
 
 const DOC = '# work handoff\n## Goal\nShip it.\n## Running now\nagent a2 (ag-2): reports the deploy.\n## Waiting on the user\nNothing.\n## Next steps\n1. Deploy.'
 
-async function setup($: $T, on: OnT, { ctx = 300_000, failEdits = false } = {}) {
+async function setup($: $T, on: OnT, { ctx = 300_000, failEdits = false, isInteractive = true } = {}) {
   const clock = mock.clock(on, { now: 1_000 })
   const seen = { writes: [] as { path: string; text: string }[], core: 0, notes: [] as string[], toasts: [] as string[], prompts: [] as string[] }
   on('command.register', () => ({ value: undefined }) as never)
@@ -48,7 +48,7 @@ async function setup($: $T, on: OnT, { ctx = 300_000, failEdits = false } = {}) 
   on('tool.call', (_, e) =>
     (failEdits && e.tool === 'Edit' ? { result: { error: 'old_string not found' }, text: 'old_string not found', isError: true } : { result: { stdout: 'ok' }, text: 'ok' }) as never,
   )
-  await $.session.start({ cwd: '/home/me/work', surface: 'terminal', isInteractive: true })
+  await $.session.start({ cwd: '/home/me/work', surface: 'terminal', isInteractive })
   return { clock, seen }
 }
 
@@ -408,5 +408,18 @@ test('autoHandoff off: idle does nothing, mid-task or not', { options: { autoHan
   await $.turn.complete(done('Half done.', 't1'))
   await clock.advance(60 * 60_000)
   expect(seen.core).toBe(0)
+  expect(asked(seen)).toBe(0)
+})
+
+test('headless (claude -p, an SDK host such as T3 Code): never starts a turn or a compaction of its own', async ($, on) => {
+  const { clock, seen } = await setup($, on, { isInteractive: false })
+  await $.tool.call({ tool: 'Bash', command: 'git push origin main' } as never)
+  await $.turn.complete(done('Pushed.', 't1')) // a phase end at 300k
+  await clock.advance(3 * 60 * 60_000) // idle for hours
+  expect(asked(seen)).toBe(0)
+  expect(seen.core).toBe(0)
+  const r = await $.command.run({ command: 'handoff' } as never)
+  expect(r.text).toContain('needs an interactive session')
+  await clock.settle()
   expect(asked(seen)).toBe(0)
 })

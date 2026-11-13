@@ -1,6 +1,6 @@
 # ystack
 
-ystack is a collection of mods, skills, and setup tools for Claude Code, Codex, and OpenCode. It is for developers who run coding agents for long sessions and want checks on their work and usage.
+ystack is a collection of mods, skills, and setup tools for Claude Code, Codex, OpenCode and Antigravity. It is for developers who run coding agents for long sessions and want checks on their work and usage.
 
 On one heavy user's logs, it cut usage about 78% per hour of work and 39% per API call. [How that was measured](#what-the-logs-show).
 
@@ -63,19 +63,25 @@ claude plugin marketplace update ystack && for m in $(claude plugin list | grep 
 
 Restart Claude Code after an update to load the new versions.
 
-## Skills for Claude Code, Codex and OpenCode
+## Headless: `claude -p` and harnesses
+
+ystack works when Claude Code runs headless: `claude -p`, the Agent SDK, and apps built on them such as T3 Code. Install it the same way; the harness runs the same Claude Code, so it loads the same mods and skills.
+
+Headless, the guards and rewrites work as usual (`push-guard`, `verify`, `package-bouncer`, `iron-rules`, `model-router` and the rest). What needs a person is skipped: panes and the prompt box don't exist, toasts and status lines arrive as `ui_toast` and `ui_status` events the harness can show or ignore, and no mod starts a turn of its own. `context-meter` doesn't hand off or compact by itself there, since an unasked turn would show up in the harness's chat; Claude Code's own auto-compaction still runs. Commands you type, such as `/review-panel` or `/queue`, work as they do in a terminal.
+
+## Skills for Claude Code, Codex, OpenCode and Antigravity
 
 ```bash
 git clone https://github.com/ychampion/ystack.git ~/ystack && ~/ystack/setup
 ```
 
-Setup installs every skill in `skills/` for each agent you have (Claude Code, Codex, OpenCode). Run it again to update them. Machine-specific values, including your git identity, thresholds, and paths, are settings you fill in at install.
+Setup installs every skill in `skills/` for each agent you have (Claude Code, Codex, OpenCode, Antigravity). Run it again to update them. Machine-specific values, including your git identity, thresholds, and paths, are settings you fill in at install.
 
 On macOS and Linux, skills are symlinks into the checkout, so `git pull` updates them. On Windows (Git Bash), they are copies: re-run `./setup` after each pull, or use `/ystack-upgrade`.
 
 | Flag | Does |
 | --- | --- |
-| `--host claude,codex,opencode` | Pick hosts (default: every host whose home folder exists; `all` for all three) |
+| `--host claude,codex,opencode,antigravity` | Pick hosts (default: every host found on this machine; `all` for all four; `agy` is short for `antigravity`) |
 | `--agents` | Also install the `opus-medium`, `opus-high`, and `haiku-max` subagent types into `~/.claude/agents` |
 | `--mods` | Print the commands that add the marketplace and a starter set of mods; add `--yes` to run them |
 | `--dry-run` | Show what would change without changing anything |
@@ -97,13 +103,13 @@ Later, `/ystack-upgrade` pulls, re-runs setup for the same hosts, and updates in
 | Folder | For | Status |
 | --- | --- | --- |
 | [`claude/`](claude/) | Claude Code | 33 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
-| [`skills/`](skills/) | Claude Code, Codex, OpenCode, and other agents that read skills | 20 skills: engineering workflow (`blast-radius`, `interrogate`, `arena`, `recall`), design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
+| [`skills/`](skills/) | Claude Code, Codex, OpenCode, Antigravity (Gemini models, in the app and the `agy` CLI), and other agents that read skills | 20 skills: engineering workflow (`blast-radius`, `interrogate`, `arena`, `recall`), design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
 | [`codex/`](codex/) | Codex CLI | A brief template for unattended `codex exec` runs; pairs with the `codex-ladder` mod |
 | [`ops/`](ops/) | Any Linux server | `security-sweep`: a weekly scan of OS packages, repos, and containers that installs only restart-free security patches and reports the rest |
 
 Most agent stacks provide skills: written advice the model may or may not follow. ystack also has mods, which use hooks on tool calls, prompts, and subagent turns. Rules such as requiring a real check before reporting work done and checking for keys in pushed commits run as code every time, whether the model remembers them or not.
 
-Guards cover keys pushed to a remote, private repos made public, force-pushes over `main`, and hallucinated packages installed. Decisions that need your input go to an inbox while the agent continues with its recommended default. The same skills work across Claude Code, Codex, and OpenCode; Codex also gets a brief template and an effort ladder.
+Guards cover keys pushed to a remote, private repos made public, force-pushes over `main`, and hallucinated packages installed. Decisions that need your input go to an inbox while the agent continues with its recommended default. The same skills work across Claude Code, Codex, OpenCode and Antigravity; Codex also gets a brief template and an effort ladder.
 
 ## What the logs show
 
