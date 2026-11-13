@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { after, before, describe as group, test } from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 import { decide, describe, ghPublic, kindsIn, parsePush, scanDiff } from './push-guard.mjs'
 
@@ -146,4 +146,22 @@ group('against a real repository with a bare remote', () => {
     assert.deepEqual(JSON.parse(bad.stdout), { decision: 'allow' })
     assert.match(bad.stderr, /internal error, letting it through/)
   })
+})
+
+test('git is never taken from the current folder or a relative PATH entry', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-plant-'))
+  try {
+    const name = process.platform === 'win32' ? 'git.exe' : 'git'
+    fs.writeFileSync(path.join(dir, name), 'planted')
+    const mod = path.join(path.dirname(fileURLToPath(import.meta.url)), 'push-guard.mjs')
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import { gitPath } from ${JSON.stringify(pathToFileURL(mod).href)}; console.log(gitPath() ?? '')`], {
+      cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: '.' + path.delimiter + (process.env.PATH || process.env.Path || '') },
+    })
+    const found = r.stdout.trim()
+    assert.ok(found, r.stderr)
+    assert.ok(path.isAbsolute(found))
+    assert.notEqual(path.dirname(found).toLowerCase(), dir.toLowerCase())
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
 })

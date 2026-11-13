@@ -8,6 +8,8 @@
 // Any internal error or overrun lets the command through and logs to stderr: a guard must never wedge the agent.
 
 import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { delimiter, isAbsolute, join } from 'node:path'
 
 import { ALLOW, argsOf, commandCwd, commandsIn, isDynamic, isMain, log, runHook } from './lib.mjs'
 
@@ -194,9 +196,32 @@ export function describe(findings, max = 10) {
 const SAFE = ['-c', 'core.fsmonitor=', '-c', `core.hooksPath=${process.platform === 'win32' ? 'NUL' : '/dev/null'}`, '-c', 'log.showSignature=false', '-c', 'diff.external=', '-c', 'core.pager=cat', '-c', 'diff.mnemonicPrefix=false', '-c', 'diff.noprefix=false', '-c', 'core.quotePath=true']
 const MAX_OUT = 4 * 1024 * 1024
 
+let GIT_PATH
+/**
+ * git's absolute path, found once through absolute PATH entries only. On Windows a bare 'git' is looked up in the
+ * current folder before PATH, and git runs with the repo as its current folder, so a git.exe planted in a repo
+ * would run. Relative PATH entries are skipped for the same reason.
+ */
+export function gitPath() {
+  if (GIT_PATH !== undefined) return GIT_PATH
+  const names = process.platform === 'win32' ? ['git.exe'] : ['git']
+  GIT_PATH = null
+  for (const dir of (process.env.PATH || process.env.Path || '').split(delimiter)) {
+    const d = dir.replace(/^"|"$/g, '')
+    if (!d || !isAbsolute(d)) continue
+    for (const n of names) {
+      const p = join(d, n)
+      if (existsSync(p)) return (GIT_PATH = p)
+    }
+  }
+  return GIT_PATH
+}
+
 /** Runs git with hooks, fsmonitor, external diff and pager off. `cut`: the output hit the 4 MB cap. */
 export function git(cwd, args) {
-  const r = spawnSync('git', [...SAFE, ...args], { cwd, encoding: 'utf8', timeout: 15_000, maxBuffer: MAX_OUT, windowsHide: true })
+  const bin = gitPath()
+  if (!bin) return { ok: false, out: '', err: 'git not found on PATH', cut: false }
+  const r = spawnSync(bin, [...SAFE, ...args], { cwd, encoding: 'utf8', timeout: 15_000, maxBuffer: MAX_OUT, windowsHide: true })
   const cut = r.error?.code === 'ENOBUFS'
   return { ok: (r.status === 0 && !r.error) || cut, out: r.stdout ?? '', err: String(r.stderr || r.error?.message || '').trim().slice(0, 200), cut }
 }

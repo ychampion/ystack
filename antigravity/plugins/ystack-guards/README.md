@@ -13,6 +13,14 @@ Each guard lets the command through (and writes to stderr) if it crashes or runs
 blocks the agent by failing. "Allow" from a guard only means "no objection": your own permission settings
 still apply.
 
+## What it doesn't catch
+
+These guards catch honest mistakes. They are not a security boundary against an agent or a repo that is trying to get past them:
+- push-guard reads the command line as written. A git alias (`git p` for `git push`), push refspecs set in `remote.<name>.push`, or a word escaped with backslashes in bash can hide a push or a force-push from it.
+- It decides what is outgoing from your local remote-tracking refs, so a ref changed by hand can hide commits.
+- When a guard crashes, times out or can't reach a registry, it lets the command through.
+- git is always run from an absolute PATH entry, never from the repo's own folder.
+
 ## Install
 
 ```sh
