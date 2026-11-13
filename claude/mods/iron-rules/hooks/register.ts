@@ -15,8 +15,8 @@ type Rules = { useBun: boolean; noAttribution: boolean; gitName: string; gitEmai
 function rulesFrom(options: PluginOptions): Rules {
   const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
   return {
-    useBun: options.useBun !== false,
-    noAttribution: options.noAttribution !== false,
+    useBun: options.useBun === true, // off unless turned on: these are house rules, not defaults for everyone
+    noAttribution: options.noAttribution === true,
     gitName: text(options.gitName),
     gitEmail: text(options.gitEmail),
   }

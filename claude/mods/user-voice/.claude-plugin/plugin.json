@@ -1,6 +1,6 @@
 {
   "name": "user-voice",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ties building to what real users said. On a feature request it finds matching quotes in your notes folder (simple keyword search, no model) and hands them to Claude; on a rough request Claude proposes 2-3 concrete options first and lets you pick in one question. A quiet band says when no user note mentions it. /user-voice shows the matches.",
   "author": {
     "name": "ychampion"

@@ -1,7 +1,7 @@
 {
   "name": "iron-rules",
-  "version": "0.2.0",
-  "description": "Enforces house rules on shell calls: bun instead of npm, your git commit identity, no AI attribution in commits and PRs, safe Windows deletes.",
+  "version": "0.2.1",
+  "description": "House rules on shell calls, each off until you turn it on in /config: bun instead of npm, your git commit identity, no AI attribution in commits and PRs. Always blocks nested Windows shell deletes, whose quoting breaks.",
   "author": {
     "name": "ychampion"
   },
@@ -22,13 +22,13 @@
       "type": "boolean",
       "title": "Rewrite npm/npx to bun/bunx",
       "description": "Rewrites npm/npx commands to bun/bunx before they run.",
-      "default": true
+      "default": false
     },
     "noAttribution": {
       "type": "boolean",
       "title": "Strip AI attribution from commits and PRs",
       "description": "Removes Co-Authored-By Claude and \"Generated with Claude Code\" lines from commit and PR text.",
-      "default": true
+      "default": false
     }
   }
 }

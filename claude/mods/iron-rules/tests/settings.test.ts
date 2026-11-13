@@ -11,7 +11,14 @@ function shell(on: On): string[] {
   return seen
 }
 
-test('identity, bun and attribution follow the settings', { options: { gitName: 'octocat', gitEmail: 'o@example.com' } }, async ($, on) => {
+test('a fresh install changes nothing: every house rule is off until turned on', async ($, on) => {
+  const seen = shell(on)
+  const command = 'git commit -m "Co-Authored-By: Claude" && npm install'
+  await $.tool.call({ tool: 'Bash', command })
+  expect(seen).toEqual([command])
+})
+
+test('identity, bun and attribution follow the settings', { options: { gitName: 'octocat', gitEmail: 'o@example.com', useBun: true, noAttribution: true } }, async ($, on) => {
   const seen = shell(on)
   await $.tool.call({ tool: 'Bash', command: 'git commit -m "x" -m "Co-Authored-By: Claude <noreply@anthropic.com>" && npm install' })
   expect(seen).toEqual(['git -c user.name=octocat -c user.email=o@example.com commit -m "x" -m "" && bun install'])

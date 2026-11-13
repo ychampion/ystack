@@ -82,6 +82,8 @@ export const register: Register = (on, options) => {
     }
     const dir = await evidenceRoot($)
     const hasDir = (await $.fs.exists(dir).catch(() => false)) === true
+    // No notes folder yet: user-voice stays out of the way (no quotes to add, and no propose-first round).
+    if (!hasDir) return next(e)
     const quotes = hasDir ? findQuotes(e.text, await loadDocs($, dir), maxQuotes) : []
     // "just do it", "no questions", "go ahead": the owner has opted out of a question round, so it is built as asked.
     const isBuildAsAsked = isConcrete(e.text) || isOptOut(e.text)

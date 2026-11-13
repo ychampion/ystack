@@ -59,7 +59,8 @@ test('"just do it" or "no questions" means no propose-first question round', asy
   mock.clock(on, { now: 5_000 })
   on('session.root', () => ({ value: '/proj' }))
   on('env.get', () => ({ value: undefined }) as never)
-  on('fs.exists', () => ({ value: false })) // no notes folder: only the propose-first part is in play
+  on('fs.exists', () => ({ value: true })) // a notes folder with nothing in it: only the propose-first part is in play
+  on('fs.list', () => ({ value: [] }) as never)
   let seen: readonly string[] = []
   on('prompt.submit', (_, e) => {
     seen = e.context ?? []
@@ -100,4 +101,19 @@ test('a feature prompt gets the evidence as context; a bug report gets nothing',
   seen = []
   await $.prompt.submit({ text: 'fix the crash on the login page', origin: { kind: 'composer' }, wait: false } as Parameters<typeof $.prompt.submit>[0])
   expect(seen).toEqual([])
+})
+
+test('no notes folder: user-voice adds nothing, not even the propose-first round', async ($, on) => {
+  mock.clock(on, { now: 5_000 })
+  on('session.root', () => ({ value: '/proj' }))
+  on('env.get', () => ({ value: undefined }) as never)
+  on('fs.exists', () => ({ value: false }))
+  let seen: readonly string[] = []
+  on('prompt.submit', (_, e) => {
+    seen = e.context ?? []
+    return { text: e.text } as never
+  })
+  type Submit = Parameters<typeof $.prompt.submit>[0]
+  await $.prompt.submit({ text: 'add invoice export to the dashboard', origin: { kind: 'composer' }, wait: false } as Submit)
+  expect(seen.join('\n')).not.toContain('user-voice')
 })
