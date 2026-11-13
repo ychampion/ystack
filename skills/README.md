@@ -42,6 +42,12 @@ Fixes learned the hard way, written so the next agent recognises the symptom.
 | `bun-playwright-runner-selection` | "Playwright Test did not expect test() to be called here": a spec file run with `bun test`. |
 | `ystack-upgrade` | Pull the latest ystack and re-run setup for the same hosts, then update installed mods. |
 
+## Ideas
+
+| Skill | What it does |
+| --- | --- |
+| `idea-scout` | What to build, from what people are struggling with now, not from the model's memory. Scans Hacker News, GitHub issues and new repos, Reddit, changelogs and launches for dated, linked evidence of real problems, runs them through five lenses for less obvious angles (new capability × old pain, tool refugees, abandoned-but-loved projects, shared scripts, agents as users), checks what already exists, and writes 5-8 ranked briefs: open-source tools, side projects or company-size ideas, each with quotes, links, the gap, why now and a first build. `dig <idea>` goes deep on one: demand over time, every competitor and its users' complaints, the first 10 users and a test to run this week. No link, no claim. Needs web search. |
+
 ## Founders
 
 These four share a founder hub folder, `$FOUNDER_HUB` (default `~/founder`), that holds the current bet, ideas and the evidence real people gave you. Each one offers to create the files it needs. The agent drafts outreach; you send it.
