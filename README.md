@@ -4,6 +4,8 @@ ystack is a collection of mods, skills, and setup tools for Claude Code, Codex, 
 
 On one heavy user's logs, it cut usage about 78% per hour of work and 39% per API call. [How that was measured](#what-the-logs-show).
 
+> **Early version (0.1).** It works and is used daily, but expect frequent changes: broader host support, more mods and new skill packs are on the way. Issues and requests are welcome. [Changelog](CHANGELOG.md).
+
 ## Install
 
 ```bash
@@ -87,3 +89,7 @@ You can also use [`claude/tools/usage-report.py`](claude/tools/usage-report.py) 
 ```bash
 python claude/tools/usage-report.py --days 14
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE). Skills adapted from other authors (`cinematic-shot`, `clean-ui-shot`, `earshot`, `real-sound`, `taste-skill`) keep their own MIT licence and credits in their folders.
