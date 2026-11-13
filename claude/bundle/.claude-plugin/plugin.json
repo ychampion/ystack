@@ -1,7 +1,7 @@
 {
   "name": "ystack",
   "version": "0.1.0",
-  "description": "Installs every ystack mod for Claude Code in one go. Uninstall any single mod afterwards if you don't want it.",
+  "description": "Installs every ystack mod and plugin for Claude Code in one go. Uninstall any single one afterwards if you don't want it.",
   "author": {
     "name": "ychampion"
   },
@@ -38,6 +38,7 @@
     "model-router",
     "session-board",
     "weekly-digest",
-    "model-checkup"
+    "model-checkup",
+    "self-learning"
   ]
 }

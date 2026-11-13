@@ -87,6 +87,7 @@ Also in this folder: [`agents/`](agents/) holds the `opus-medium`, `opus-high` a
 
 | Mod | What it does | Works with |
 | --- | --- | --- |
+| `self-learning` | `/learn <topic>` researches a technology from its official docs, checks facts across several sources, asks what to focus on when the topic is broad, and writes a reusable skill (install, examples, pitfalls) to this project or to all projects. `/update-skill <topic>` refreshes one with current docs; `/list-skills` shows what you have. A plugin of commands and agents, not hooks. | web search and fetch |
 | `memory-recall` | When a tool call fails, matches the error against your memory notes and skills and points Claude at the one that fits. | Claude Code auto-memory, `~/.claude/skills` |
 | `auto-claudeception` | After a long debugging turn or a "turns out" discovery, suggests `/claudeception` to save what was learned as a skill. Never runs it by itself. | a `/claudeception` skill |
 

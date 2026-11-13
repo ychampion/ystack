@@ -140,6 +140,10 @@
     {
       "name": "model-checkup",
       "source": "./claude/mods/model-checkup"
+    },
+    {
+      "name": "self-learning",
+      "source": "./claude/plugins/self-learning"
     }
   ]
 }

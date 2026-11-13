@@ -1,0 +1,8 @@
+{
+  "name": "self-learning",
+  "version": "1.2.0",
+  "description": "/learn <topic>: researches a technology from its official docs, checks facts across sources, and writes a reusable skill (install, examples, pitfalls). /update-skill refreshes one; /list-skills shows them.",
+  "author": {
+    "name": "ychampion"
+  }
+}

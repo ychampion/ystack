@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `self-learning` plugin joins ystack: `/learn <topic>` turns a technology's docs into a reusable skill. Its agents now use your session's model, skills are saved only where updates can't overwrite them, and its command metadata parses again.
+- Engineering workflow skills: `blast-radius`, `interrogate`, `arena`, `recall`.
 - `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 33 mods in one go.
 - README: install everything first, then a grouped list of the mods to pick from, and how to update (auto-update or by hand).
 

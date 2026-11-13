@@ -21,6 +21,15 @@ Install them all with `./setup` from the root of this repo; it finds every folde
 | `real-sound` | Soundtracks for code-made videos from real licensed recordings, with credits and a loudness and sync audit. | Python audio libs, ffmpeg |
 | `earshot` | Ears for an agent: judge, compare and check sound it can't hear, and quote the numbers instead of guessing. | the [earshot](https://github.com/Leonxlnx/earshot) CLI |
 
+## Engineering workflow
+
+| Skill | What it does |
+| --- | --- |
+| `blast-radius` | Before a change ships: finds what it can break outside the diff (including names held as strings and old-format data on disk), sorts every consumer by risk, and proves the riskiest one safe by running code. |
+| `interrogate` | Reviewers from different model families (for example Claude and Codex) review the same change independently; every finding is then confirmed or rejected by running code, not by vote. |
+| `arena` | 2-4 deliberately different attempts at the same task in separate worktrees, judged by one acceptance check you write first; the best becomes the base and the others' strongest parts are grafted in. |
+| `recall` | "Where did I leave off?": rebuilds the state of a piece of work from git, handoff notes and past Claude Code or Codex sessions, checks each claim against the live repo, and returns a short brief. |
+
 ## Agent operations
 
 Fixes learned the hard way, written so the next agent recognises the symptom.
