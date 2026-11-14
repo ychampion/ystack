@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 12 new skills of our own: `debug-loop`, `flaky-test`, `perf-loop`, `dep-upgrade`, `migration-plan`, `secure-diff`, `repo-map`, `release-notes`, `postmortem`, `grill`, `agent-writing`, `eval-judge`. Short, for agents to act on; `debug-loop` and `flaky-test` were tried on planted bugs by headless agents.
+- 18 skills from other open collections, each with its licence and a NOTICE of changes: `diagnosing-bugs`, `tdd`, `prototype`, `grilling`, `to-spec`, `to-tickets`, `wayfinder`, `to-questionnaire`, `research`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `writing-for-agents`, `teach`, `retro`, `wizard`, `pr` and `migrate-to-rust` (whose report page now escapes the text it shows).
 - New skill `idea-scout`: ideas for what to build (open-source tools, side projects, company-size) from live, dated, linked evidence of what people struggle with now, never from model memory alone. `dig <idea>` goes deep on one. Installed by `./setup` for Claude Code, Codex, OpenCode and Antigravity.
 - Docs: [What changes when you install everything](claude/README.md#what-changes-when-you-install-everything) lists every mod that acts on its own after install (handoffs, nudges, guards, shortened output), what you'll notice, and the setting that turns each one off. The main README points to it from the install line.
 - Installing everything no longer imposes one person's habits: `iron-rules` 0.2.1 has every house rule off until you turn it on (`useBun`, `noAttribution`, git identity), and `user-voice` 0.1.1 does nothing until you have a notes folder.
