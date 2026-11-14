@@ -53,7 +53,7 @@ Most mods wait for a command (`/handoff`, `/why`, `/diet`, `/queue`, …). The o
 | `memory-recall` | When a tool call fails, points Claude at the memory note or skill that matches the error. | disable the mod |
 | `session-recovery`, `model-checkup`, `auto-claudeception`, `pin` | Only suggest something in a toast or the prompt box (reopen crashed sessions, run a prompt audit, save a skill, pin a rule). They never act on their own. | disable the mod |
 
-**Off until you set them up:** `iron-rules`, `user-voice` (needs a notes folder), `operator-context` (needs a profile file), `twins` (needs a `twins.json`), `verify`'s live test runner, the `prompt-diet` and `weekly-digest` options that change or send anything.
+**Off until you set them up:** `living-themes` (nothing shows until you pick a theme with `/live-theme`), `iron-rules`, `user-voice` (needs a notes folder), `operator-context` (needs a profile file), `twins` (needs a `twins.json`), `verify`'s live test runner, the `prompt-diet` and `weekly-digest` options that change or send anything.
 
 Settings are in `/config` under each mod's name. To disable a mod: `/plugin` → Installed → pick it, or `claude plugin disable <mod>@ystack`. If you only want some of the mods, skip the bundle and install the ones you want one at a time.
 
@@ -123,6 +123,12 @@ Also in this folder: [`agents/`](agents/) holds the `opus-medium`, `opus-high` a
 | `operator-context` | Gives Claude your own profile (who you are, what you own, what you authorize) as facts for its judgment that never override safety rules; lines that try to switch safety off are dropped and shown to you. `/operator`. | `profileFile`, `subagents` |
 | `twins` | Tells you when one of two copies (a live copy and a shared one, code and docs) falls behind after an edit. Never edits and never prompts Claude by itself; only `/twins sync <name>` asks Claude to port the change. | `twinsFile` (+ `~/.claude/twins.json`) |
 | `weekly-digest` | `/digest`: a plain summary of your week per repo: what shipped (merged PRs, pushed commits), what's in flight, what's waiting on you in the decision inbox, and the time and tokens each repo took. Saved as a local markdown file. Nothing leaves your machine unless you turn on `polish`, which sends folder paths, commit and PR titles and waiting decisions to a small model to write a short team or investor update. | `digestDir`, `extraRepos`, `authorEmails`, `polish` |
+
+## Look
+
+| Mod | What it does | Settings |
+| --- | --- | --- |
+| `living-themes` | Animated backdrops behind the chat in the desktop app that react to what Claude is doing and to your time of day and season. Twelve scenes: glyph-tile sharks, a lighthouse, a pixel city, a tree through the seasons, a tide clock, a night reef, a forge, a radar scope, a rainy window, a mission chart, a cottage garden and a desert caravan. Each shows thinking, running tools, each subagent (a boat, a drone, a fish, a camel...), a failed tool (a storm, red silt, a red contact) and a merge or passing tests (a calm sea, fireworks, a bloom); "auto" scenes are light by day and dark at night and switch the app with them. `/live-theme` picks one for every session (or `session` for this one); `/live-theme calm on` keeps only time and season. Built on Anthropic's theme-examples (Apache-2.0, see its `NOTICE.md`). | `utcOffset`, `hemisphere`, `reactToAgent` |
 
 ## Learning
 

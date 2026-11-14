@@ -1,0 +1,29 @@
+{
+  "name": "living-themes",
+  "version": "0.1.0",
+  "description": "Animated backdrops behind the chat in the desktop app that react to what Claude is doing (thinking, running tools, subagents, a failure, a merge) and follow your local time of day and season; /live-theme picks one.",
+  "author": { "name": "ychampion" },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "utcOffset": {
+      "type": "string",
+      "title": "UTC offset",
+      "description": "Your clock's offset from UTC, such as +5:30 or -8. Empty: read it from the system clock.",
+      "default": ""
+    },
+    "hemisphere": {
+      "type": "string",
+      "title": "Hemisphere",
+      "description": "Which half of the world you live in, for the seasons.",
+      "default": "north",
+      "options": ["north", "south"]
+    },
+    "reactToAgent": {
+      "type": "boolean",
+      "title": "React to Claude",
+      "description": "Let the scene change with what Claude is doing. Off: only the time of day and the season change it (the same as /live-theme calm on, for every session).",
+      "default": true
+    }
+  }
+}
