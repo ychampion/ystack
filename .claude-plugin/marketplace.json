@@ -156,6 +156,10 @@
     {
       "name": "transcript-compress",
       "source": "./claude/mods/transcript-compress"
+    },
+    {
+      "name": "image-theme",
+      "source": "./claude/mods/image-theme"
     }
   ]
 }

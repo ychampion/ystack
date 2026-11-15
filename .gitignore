@@ -6,3 +6,5 @@ Thumbs.db
 *.log
 .mcpb-cache/
 .omx/
+# Backgrounds image-theme bakes at run time
+claude/mods/image-theme/backgrounds/

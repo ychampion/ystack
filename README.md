@@ -20,7 +20,7 @@ Or from a shell:
 claude plugin install ystack --marketplace ychampion/ystack
 ```
 
-This adds the `ystack` marketplace and installs all 36 mods plus the `self-learning` plugin. Restart Claude Code (or run `/reload-plugins`) to load them. Don't want one of them? `claude plugin uninstall <mod>` removes just that one. Mods with settings show a settings screen during install; change them later in `/config`.
+This adds the `ystack` marketplace and installs all 37 mods plus the `self-learning` plugin. Restart Claude Code (or run `/reload-plugins`) to load them. Don't want one of them? `claude plugin uninstall <mod>` removes just that one. Mods with settings show a settings screen during install; change them later in `/config`.
 
 Some mods act on their own from the start. For example, `context-meter` swaps a very long conversation for a short handoff note, `keep-going` sends Claude back to work when it offers to continue, and `push-guard` refuses risky pushes. Before installing everything, read [what changes when you install everything](claude/README.md#what-changes-when-you-install-everything), which also says how to turn each one off.
 
@@ -41,7 +41,7 @@ In the Claude desktop app's Code tab, `/plugin` does not run: click + next to th
 | Delegation | `model-router` (right model and effort per subagent) · `decision-inbox` (agents keep going while your decisions wait) · `brief-linter` (complete subagent briefs) · `assumptions-ledger` (checks what subagents assumed) · `spec-sharpener` (pointed questions before big builds) · `review-panel` (parallel specialist review) |
 | Long sessions | `context-meter` (handoffs and compaction at the right time) · `session-board` (every session on one board) · `session-recovery` (reopen sessions after a crash or restart) · `night-shift` (unattended task queue) · `loop-breaker` (stops going in circles) · `lanes` (several sessions, one repo) · `pin` (rules that survive compaction) · `keep-going` (no needless "want me to continue?") |
 | Cost | `prompt-diet` (what every turn sends) · `output-diet` (shorter build and test output) · `transcript-compress` (frees disk space by compressing old transcripts, losslessly) |
-| Look | `living-themes` (animated desktop-app backdrops that react to Claude, the time and the season; `winter-cabin` also shows context fill and cache time) |
+| Look | `living-themes` (animated desktop-app backdrops that react to Claude, the time and the season; `winter-cabin` also shows context fill and cache time) · `image-theme` (any picture you choose becomes your background, with theme colours taken from it) |
 | For the owner | `owner-view` (plain-English captions, `/brief-me`) · `user-voice` (what users said, on feature requests) · `operator-context` (your profile as facts) · `twins` (copies that fall behind) · `weekly-digest` (your week per repo) |
 | Learning | `code-threads` (`/why <file:line>`: the Claude conversation that wrote that code, what was asked and why) · `self-learning` (`/learn <topic>`: researches a technology's docs and writes a reusable skill) · `memory-recall` (past fixes on a failing tool call) · `auto-claudeception` (saves what a debugging session learned) |
 
@@ -105,7 +105,7 @@ Later, `/ystack-upgrade` pulls, re-runs setup for the same hosts, and updates in
 
 | Folder | For | Status |
 | --- | --- | --- |
-| [`claude/`](claude/) | Claude Code | 36 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
+| [`claude/`](claude/) | Claude Code | 37 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
 | [`skills/`](skills/) | Claude Code, Codex, OpenCode, Antigravity (Gemini models, in the app and the `agy` CLI), and other agents that read skills | 51 skills: engineering workflow (`blast-radius`, `interrogate`, `arena`, `recall`, `debug-loop`, `flaky-test`, `perf-loop`, `secure-diff`, `migration-plan` and more), planning and agent-writing (`grill`, `agent-writing`, `eval-judge`), ideas from live evidence (`idea-scout`), 18 picked from other open collections (`tdd`, `wayfinder`, `prototype`, `migrate-to-rust`…), design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
 | [`antigravity/`](antigravity/plugins/ystack-guards/) | Antigravity (the app and the `agy` CLI) | `ystack-guards`, a plugin with three guards as Antigravity hooks: `push-guard` (no keys in a push, no repo made public, no force-push to `main`), `package-bouncer` (no made-up or brand-new packages) and `verify` (no "done" without a check). `./setup` installs it with the skills |
 | [`codex/`](codex/) | Codex CLI | A brief template for unattended `codex exec` runs; pairs with the `codex-ladder` mod |

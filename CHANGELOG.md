@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-11-16)
 
+- New mod `image-theme`: `/image-theme` turns any picture you choose into your Claude theme. The picture becomes the desktop app background, softly veiled, with a frosted column behind the chat on Windows, and the theme colours come from it (surface tint, accent, light or dark). Works on Windows, macOS and Linux (ImageMagick); Claude can set it for you too. The `ystack` bundle (0.1.2) includes it.
 - `living-themes` 0.1.3: new `first-snow` theme, the context fill on its own: falling snow and a snowbank that rises across the foot of the window as the context fills, burying a fence (a compaction clears it), with the context sign and cache candle. Snow, smoke and flames now animate with SMIL, so they move however the app draws the scene; reduced motion shows still snow.
 - `living-themes` 0.1.2: `winter-cabin` gets a frosted glass column behind the chat (the scene's edges stay bright), fluffy snow clumps on the tree, glowing light halos, fairy lights and icicles on the cabin, a snowy pine forest and three depths of falling snow.
 - `living-themes` 0.1.1: new `winter-cabin` scene that shows the session's own numbers: a sign with the context fill (snow piles up and buries the snowman as it grows; a compaction clears it) and a candle that burns down with the minutes left on the prompt cache (`cacheMinutes` setting, 60 by default).
@@ -19,7 +20,7 @@
 - Long-sessions doc: how the one-hour cache cliff differs from compaction.
 - `self-learning` plugin joins ystack: `/learn <topic>` turns a technology's docs into a reusable skill. Its agents now use your session's model, skills are saved only where updates can't overwrite them, and its command metadata parses again.
 - Engineering workflow skills: `blast-radius`, `interrogate`, `arena`, `recall`.
-- `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 36 mods in one go.
+- `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 37 mods in one go.
 - README: install everything first, then a grouped list of the mods to pick from, and how to update (auto-update or by hand).
 
 ## 0.1.0 (2026-11-14): first public release

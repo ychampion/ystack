@@ -1,6 +1,6 @@
 {
   "name": "ystack",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Installs every ystack mod and plugin for Claude Code in one go. Uninstall any single one afterwards if you don't want it.",
   "author": {
     "name": "ychampion"
@@ -42,6 +42,7 @@
     "self-learning",
     "code-threads",
     "living-themes",
-    "transcript-compress"
+    "transcript-compress",
+    "image-theme"
   ]
 }

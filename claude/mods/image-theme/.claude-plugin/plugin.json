@@ -1,0 +1,22 @@
+{
+  "name": "image-theme",
+  "version": "0.1.0",
+  "description": "Turns a picture you choose into your Claude theme: the picture becomes the app background, softly veiled with a frosted column behind the chat, and the theme colours are taken from it. /image-theme opens a file picker.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "veil": {
+      "type": "number",
+      "title": "Veil (0 to 0.8)",
+      "description": "How much of the theme's page colour is laid over the picture so text stays readable. 0 shows the picture as it is.",
+      "default": 0.2
+    },
+    "frostedColumn": {
+      "type": "boolean",
+      "title": "Frosted column",
+      "description": "Blur and tint the middle of the picture, behind the chat, fading out at both sides (Windows).",
+      "default": true
+    }
+  }
+}
