@@ -1,6 +1,6 @@
 {
   "name": "living-themes",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Animated backdrops behind the chat in the desktop app that react to what Claude is doing (thinking, running tools, subagents, a failure, a merge) and follow your local time of day and season; /live-theme picks one.",
   "author": { "name": "ychampion" },
   "license": "MIT",

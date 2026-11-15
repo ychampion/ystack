@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `living-themes` 0.1.2: `winter-cabin` gets a frosted glass column behind the chat (the scene's edges stay bright), fluffy snow clumps on the tree, glowing light halos, fairy lights and icicles on the cabin, a snowy pine forest and three depths of falling snow.
 - `living-themes` 0.1.1: new `winter-cabin` scene that shows the session's own numbers: a sign with the context fill (snow piles up and buries the snowman as it grows; a compaction clears it) and a candle that burns down with the minutes left on the prompt cache (`cacheMinutes` setting, 60 by default).
 - New mod `transcript-compress`: compresses Claude transcripts older than a week, losslessly, to free disk space (Windows and macOS file-system compression, so `/resume` still works; gzip with a restore command on Linux). Off by default: Claude suggests it at a break when 500 MB or more is waiting; `/compress-transcripts` runs it; an "Always on" setting runs it daily. The `ystack` bundle includes it.
 - New mod `living-themes`: thirteen animated backdrops for the desktop app that react to what Claude is doing (thinking, tools, subagents, a failure, a merge) and follow your local time of day and season. `/live-theme` picks one; nothing changes until you do. The `ystack` bundle (0.1.1) includes it.

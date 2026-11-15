@@ -53,7 +53,7 @@ function stars(p: Sky): string {
 
 function aurora(p: Sky): string {
   if (!p.aurora) return ''
-  return `<g opacity=".32"><path class="au" d="M-40 250C200 150 420 300 700 200S1200 120 1640 230L1640 330C1200 230 960 330 700 300S220 260 -40 350Z" fill="url(#auG)"/><path class="au b" d="M-40 170C300 90 520 220 820 150S1300 90 1640 160L1640 230C1300 170 1060 250 820 220S300 170 -40 250Z" fill="url(#auV)"/></g>`
+  return `<g opacity=".5"><path class="au c" d="M-40 300C260 230 520 330 780 270S1250 210 1640 290L1640 340C1250 280 1000 360 780 330S260 300 -40 360Z" fill="url(#auG)" opacity=".6"/><path class="au" d="M-40 250C200 150 420 300 700 200S1200 120 1640 230L1640 330C1200 230 960 330 700 300S220 260 -40 350Z" fill="url(#auG)"/><path class="au b" d="M-40 170C300 90 520 220 820 150S1300 90 1640 160L1640 230C1300 170 1060 250 820 220S300 170 -40 250Z" fill="url(#auV)"/></g>`
 }
 
 function moonOrSun(p: Sky, phase: Phase): string {
@@ -65,84 +65,125 @@ function moonOrSun(p: Sky, phase: Phase): string {
 }
 
 function mountains(p: Sky): string {
-  const far = '#5a5f9a'
-  const near = '#3d4278'
-  return `<g opacity=".55"><path d="M0 700L120 600L210 660L330 540L470 690L560 640L700 720L0 760Z" fill="${far}"/><path d="M1600 690L1500 560L1420 620L1330 520L1210 680L1120 640L1000 720L1600 760Z" fill="${far}"/></g>
-<g opacity=".7"><path d="M0 760L90 690L170 730L260 650L380 760Z" fill="${near}"/><path d="M1600 750L1530 650L1450 720L1380 670L1250 770Z" fill="${near}"/></g>
-<g fill="${p.snow}" opacity=".55"><path d="M330 540L300 568L318 566L330 580L344 566L360 570Z"/><path d="M1330 520L1305 548L1322 545L1334 560L1348 546L1360 548Z"/><path d="M120 600L100 618L114 617L124 628L134 618L142 620Z"/><path d="M1500 560L1478 582L1494 580L1504 592L1514 582L1524 584Z"/></g>`
+  const far = mixHex(p.mid, '#9aa3d8', 0.35)
+  const near = mixHex(p.top, '#5a62a0', 0.45)
+  const cap = (d: string) => `<path d="${d}" fill="${p.snow}" opacity=".8"/>`
+  return `<g opacity=".7"><path d="M0 690L110 560L200 630L330 500L470 670L560 620L720 720L0 760Z" fill="${far}"/><path d="M1600 680L1500 530L1410 610L1310 480L1180 660L1090 620L960 720L1600 760Z" fill="${far}"/>
+${cap('M330 500L292 544L312 538L330 556L348 538L372 548Z')}${cap('M110 560L84 590L102 586L114 598L128 586L140 590Z')}${cap('M1310 480L1276 520L1296 514L1312 532L1330 516L1350 522Z')}${cap('M1500 530L1472 562L1490 558L1502 572L1516 558L1530 562Z')}</g>
+<g opacity=".85"><path d="M0 760L90 680L170 720L260 640L400 760Z" fill="${near}"/><path d="M1600 750L1530 640L1450 710L1370 660L1220 770Z" fill="${near}"/>
+${cap('M260 640L240 662L254 660L262 670L272 660L284 664Z')}${cap('M1530 640L1512 660L1524 658L1532 668L1542 658L1552 660Z')}</g>`
 }
 
-function pine(x: number, base: number, h: number, p: Sky, dark: string): string {
-  const w = h * 0.42
+/** Blend two #rrggbb colours: t = 0 gives a, 1 gives b. */
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16)
+  const pb = parseInt(b.slice(1), 16)
+  let out = 0
+  for (const shift of [16, 8, 0]) {
+    const ca = (pa >> shift) & 255
+    const cb = (pb >> shift) & 255
+    out |= Math.round(ca + (cb - ca) * t) << shift
+  }
+  return `#${out.toString(16).padStart(6, '0')}`
+}
+
+/** A snow-laden pine: dark tiers with a clump of snow at each branch end. */
+function pine(x: number, base: number, h: number, dark: string, seed: number): string {
   const tiers = 4
   const parts: string[] = []
+  const snow: string[] = []
   for (let i = 0; i < tiers; i++) {
-    const top = base - h + (i * h) / (tiers + 0.6)
-    const bot = top + h / 2.6
-    const hw = (w * (i + 1.4)) / (tiers + 0.4)
-    parts.push(`<path d="M${x} ${r1(top)}L${r1(x - hw)} ${r1(bot)}L${r1(x + hw)} ${r1(bot)}Z" fill="${dark}"/>`)
-    parts.push(`<path d="M${r1(x - hw)} ${r1(bot)}q${r1(hw * 0.25)} -9 ${r1(hw * 0.5)} -2t${r1(hw * 0.5)} -1t${r1(hw * 0.5)} 0t${r1(hw * 0.5)} 2l-${r1(hw * 0.3)} -9q-${r1(hw * 0.7)} 4 -${r1(hw * 1.4)} 0Z" fill="${p.snow}"/>`)
+    const top = base - h + (i * h) / (tiers + 0.4)
+    const bot = top + h / 2.5
+    const hw = (h * 0.4 * (i + 1.3)) / (tiers + 0.3)
+    parts.push(`<path d="M${x} ${r1(top)}L${r1(x + hw)} ${r1(bot)}Q${x} ${r1(bot - 8)} ${r1(x - hw)} ${r1(bot)}Z" fill="${dark}"/>`)
+    const r = Math.max(4, h / 26)
+    snow.push(clump(x - hw, bot - r * 0.3, r, seed * 7 + i), clump(x + hw, bot - r * 0.3, r, seed * 7 + i + 50), clump(x - hw * 0.35, bot - r * 0.6, r * 0.8, seed * 7 + i + 90))
   }
-  return parts.join('')
+  return parts.join('') + snow.join('')
 }
 
-function backPines(p: Sky): string {
-  const dark = '#1f3550'
-  return `<g opacity=".85">${pine(30, 880, 260, p, dark)}${pine(330, 860, 170, p, dark)}${pine(1262, 880, 230, p, dark)}${pine(1580, 870, 250, p, dark)}</g>`
+/** A far forest line and snow-laden pines framing both sides. */
+function forest(): string {
+  const far: string[] = []
+  for (let i = 0; i < 26; i++) {
+    const side = i < 13 ? 0 : 1
+    const x = side === 0 ? 10 + i * 30 + hash(i, 5) * 14 : 1170 + (i - 13) * 34 + hash(i, 5) * 14
+    const h = 50 + hash(i, 6) * 60
+    const y = 770 + hash(i, 7) * 20
+    far.push(`<path d="M${r1(x)} ${r1(y - h)}L${r1(x + h * 0.22)} ${r1(y)}L${r1(x - h * 0.22)} ${r1(y)}Z"/>`)
+  }
+  const dark = '#112a40'
+  return `<g fill="#22355a" opacity=".8">${far.join('')}</g>
+<g>${pine(28, 900, 300, dark, 1)}${pine(360, 880, 190, dark, 2)}${pine(1255, 890, 250, dark, 3)}${pine(1590, 890, 290, dark, 4)}</g>`
 }
 
 const LIGHT_COLOURS = ['#ff5a5a', '#ffd166', '#5ee6a0', '#6fb7ff', '#ff9adf']
 
-/** The decorated tree: snow caps grow with the context fill, the lights dim under the snow and follow the activity. */
+/** A clump of snow: three overlapping rounds with a shaded underside, `r` across. */
+function clump(x: number, y: number, r: number, seed: number): string {
+  const a = r * (0.55 + hash(seed, 1) * 0.2)
+  const b = r * (0.5 + hash(seed, 2) * 0.2)
+  return `<ellipse cx="${r1(x)}" cy="${r1(y + r * 0.18)}" rx="${r1(r * 1.05)}" ry="${r1(r * 0.55)}" fill="url(#clumpShade)"/><circle cx="${r1(x - r * 0.45)}" cy="${r1(y)}" r="${r1(a)}" fill="#ffffff"/><circle cx="${r1(x + r * 0.42)}" cy="${r1(y + 1)}" r="${r1(b)}" fill="#ffffff"/><circle cx="${r1(x)}" cy="${r1(y - r * 0.28)}" r="${r1(r * 0.62)}" fill="#ffffff"/>`
+}
+
+/** The decorated tree: snow clumps on every branch tip grow and spread with the context fill; glowing lights follow the activity. */
 function tree(ctx: SceneCtx, s: number): string {
   const tiers = 6
-  const parts: string[] = []
-  const lights: string[] = []
-  const cap = 7 + s * 22
+  const body: string[] = []
+  const snow: string[] = []
+  const halos: string[] = []
+  const cores: string[] = []
   for (let i = 0; i < tiers; i++) {
-    const top = 400 + i * 72
-    const bot = top + 118
-    const hw = 40 + i * 20
+    const top = 400 + i * 70
+    const bot = top + 122
+    const hw = 42 + i * 19
     const left = TREE_X - hw
     const right = TREE_X + hw
-    parts.push(`<path d="M${TREE_X} ${top}L${left} ${bot}Q${TREE_X} ${bot + 14} ${right} ${bot}Z" fill="url(#needles)"/>`)
-    // Snow along the tier's lower edge: lumps at each branch end, thicker as the context fills.
-    const lumps = 3 + i
-    let d = `M${left - 6} ${bot + 2}`
-    for (let k = 0; k < lumps; k++) {
-      const x0 = left - 6 + ((right - left + 12) * k) / lumps
-      const x1 = left - 6 + ((right - left + 12) * (k + 1)) / lumps
-      const sag = bot + 2 + Math.sin(((k + 0.5) / lumps) * Math.PI) * 9
-      d += `Q${r1((x0 + x1) / 2)} ${r1(sag + cap * 0.55)} ${r1(x1)} ${r1(sag)}`
+    const tips = 3 + i
+    // The tier: two flanks and a bottom edge of drooping branch tips.
+    let d = `M${TREE_X} ${top}L${right} ${bot}`
+    for (let k = tips; k > 0; k--) {
+      const x0 = left + ((right - left) * k) / tips
+      const x1 = left + ((right - left) * (k - 1)) / tips
+      d += `Q${r1((x0 + x1) / 2)} ${r1(bot - 16)} ${r1(x1)} ${bot}`
     }
-    d += `L${right + 6} ${r1(bot - cap * 0.6)}`
-    for (let k = lumps - 1; k >= 0; k--) {
-      const x0 = left - 6 + ((right - left + 12) * k) / lumps
-      const x1 = left - 6 + ((right - left + 12) * (k + 1)) / lumps
-      const lift = bot - cap * (0.7 + hash(i, k) * 0.5)
-      d += `Q${r1((x0 + x1) / 2)} ${r1(lift - cap * 0.5)} ${r1(x0)} ${r1(bot - cap * 0.6)}`
+    body.push(`<path d="${d}Z" fill="url(#needles)"/><path d="M${TREE_X} ${top + 10}L${r1(TREE_X + hw * 0.55)} ${r1(bot - 8)}L${TREE_X} ${r1(bot - 14)}Z" fill="#0f4a30" opacity=".35"/>`)
+    // Snow: a clump on each tip, bigger as the context fills; past a third, more up the tier; past two thirds, the crown.
+    const r = 9 + s * 13 + i * 0.6
+    for (let k = 0; k <= tips; k++) {
+      const x = left + ((right - left) * k) / tips
+      snow.push(clump(x, bot - r * 0.35, r * (k === 0 || k === tips ? 0.85 : 1), i * 17 + k))
     }
-    parts.push(`<path d="${d}Z" fill="url(#snowFill)"/>`)
-    if (s > 0.45) {
-      // Deep snow also settles on the slopes.
-      const k = (s - 0.45) / 0.55
-      parts.push(`<path d="M${TREE_X} ${top + 4}L${r1(TREE_X - hw * 0.55)} ${r1(top + 60)}Q${TREE_X} ${r1(top + 60 - 22 * k)} ${r1(TREE_X + hw * 0.5)} ${r1(top + 58)}Z" fill="url(#snowFill)" opacity="${r1(0.5 + k * 0.5)}"/>`)
+    if (s > 0.3) {
+      const t = (s - 0.3) / 0.7
+      const n = 1 + Math.round(t * (2 + i))
+      for (let k = 0; k < n; k++) {
+        const fx = (k + 0.5) / n
+        const y = top + 42 + hash(i, k + 7) * 40
+        const span = ((y - top) / (bot - top)) * hw * 1.6
+        snow.push(clump(TREE_X - span / 2 + span * fx, y, 7 + t * 9, i * 31 + k + 400))
+      }
     }
+    if (s > 0.65) snow.push(clump(TREE_X, top + 16, 8 + (s - 0.65) * 30, i + 900))
     // A garland of lights across the tier.
     const n = 4 + i
     for (let k = 0; k < n; k++) {
       const t = (k + 0.5) / n
-      const x = left + 12 + (right - left - 24) * t
-      const y = top + 62 + i * 3 + Math.sin(t * Math.PI) * 16
-      const colour =
-        ctx.activity === 'error' ? '#ff4040' : ctx.activity === 'success' ? '#ffd76a' : (LIGHT_COLOURS[(i * 3 + k) % LIGHT_COLOURS.length] ?? '#ffd166')
-      lights.push(`<circle class="${ctx.activity === 'error' ? 'blink' : 'tw'}" style="animation-delay:-${r1(hash(i * 13 + k, 9) * 3)}s" cx="${r1(x)}" cy="${r1(y)}" r="5" fill="${colour}"/>`)
+      const x = left + 14 + (right - left - 28) * t
+      const y = top + 66 + i * 2 + Math.sin(t * Math.PI) * 18
+      const c = ctx.activity === 'error' ? 0 : ctx.activity === 'success' ? 1 : (i * 3 + k) % LIGHT_COLOURS.length
+      const cls = ctx.activity === 'error' ? 'blink' : 'tw'
+      const delay = r1(hash(i * 13 + k, 9) * 3)
+      halos.push(`<circle class="${cls}" style="animation-delay:-${delay}s" cx="${r1(x)}" cy="${r1(y)}" r="15" fill="url(#halo${c})"/>`)
+      cores.push(`<circle class="${cls}" style="animation-delay:-${delay}s" cx="${r1(x)}" cy="${r1(y)}" r="4.6" fill="${ctx.activity === 'error' ? '#ff4a4a' : ctx.activity === 'success' ? '#ffe08a' : (LIGHT_COLOURS[c] ?? '#ffd166')}"/>`)
     }
   }
-  const lightOpacity = r1(1 - s * 0.55)
-  const trunk = `<rect x="${TREE_X - 14}" y="${400 + 5 * 72 + 118}" width="28" height="40" fill="#5b3a26"/>`
+  // Snow buries the lights as it deepens: dimmer, never gone.
+  const lightOpacity = r1(1 - s * 0.5)
+  const trunk = `<rect x="${TREE_X - 15}" y="${400 + 5 * 70 + 110}" width="30" height="44" fill="#5b3a26"/>`
   const starGlow = ctx.activity === 'success' ? 'pulseBig' : 'pulse'
-  const star = `<circle class="${starGlow}" cx="${TREE_X}" cy="380" r="46" fill="url(#starGlow)"/><path d="M${TREE_X} 352L${TREE_X + 8} 372L${TREE_X + 29} 373L${TREE_X + 12} 386L${TREE_X + 18} 407L${TREE_X} 395L${TREE_X - 18} 407L${TREE_X - 12} 386L${TREE_X - 29} 373L${TREE_X - 8} 372Z" fill="#ffd25a"/>`
+  const star = `<circle class="${starGlow}" cx="${TREE_X}" cy="380" r="56" fill="url(#starGlow)"/><path d="M${TREE_X} 350L${TREE_X + 8} 371L${TREE_X + 30} 372L${TREE_X + 13} 386L${TREE_X + 19} 408L${TREE_X} 395L${TREE_X - 19} 408L${TREE_X - 13} 386L${TREE_X - 30} 372L${TREE_X - 8} 371Z" fill="#ffd25a"/><path d="M${TREE_X} 356L${TREE_X + 5} 371L${TREE_X} 382Z" fill="#fff2b0" opacity=".8"/>`
   const sparks =
     ctx.activity === 'success'
       ? `<g fill="#ffe9a0">${Array.from({ length: 12 }, (_, i) => {
@@ -150,7 +191,7 @@ function tree(ctx: SceneCtx, s: number): string {
           return `<circle class="spark" style="--dx:${r1(Math.cos(a) * 90)}px;--dy:${r1(Math.sin(a) * 90)}px;animation-delay:-${r1(hash(i, 31) * 1.6)}s" cx="${TREE_X}" cy="380" r="3.5"/>`
         }).join('')}</g>`
       : ''
-  return `${trunk}${parts.join('')}<g opacity="${lightOpacity}"><g filter="url(#soft)">${lights.join('')}</g>${lights.join('')}</g>${star}${sparks}`
+  return `${trunk}${body.join('')}<g opacity="${lightOpacity}">${halos.join('')}</g>${snow.join('')}<g opacity="${r1(0.55 + lightOpacity * 0.45)}">${cores.join('')}</g>${star}${sparks}`
 }
 
 function gifts(): string {
@@ -247,21 +288,61 @@ ${cold ? '<rect x="147" y="275" width="24" height="5" rx="2.5" fill="#fff3dc"/>'
 ${robin}</g>`
 }
 
-/** Snow falling in two layers; each layer holds its flakes twice, a screen apart, so the loop never shows a seam. */
-function snowfall(s: number): string {
-  const layer = (seed: number, count: number, rMin: number, rSpan: number, cls: string, opacity: number) => {
+/** Fairy lights along the cabin's roof edges and icicles under the eaves and the balcony. */
+function cabinTrim(ctx: SceneCtx): string {
+  const bulbs: string[] = []
+  const n = 15
+  for (let side = 0; side < 2; side++) {
+    for (let k = 1; k < n; k++) {
+      const t = k / n
+      const x = 1420 + (side === 0 ? -1 : 1) * 140 * t
+      const y = 458 + 428 * t
+      const c = ctx.activity === 'error' ? 0 : (k + side) % 2 === 0 ? 1 : 5
+      bulbs.push(`<circle class="tw" style="animation-delay:-${r1(hash(k, side + 70) * 3)}s" cx="${r1(x)}" cy="${r1(y)}" r="10" fill="url(#halo${c})"/><circle class="tw" style="animation-delay:-${r1(hash(k, side + 70) * 3)}s" cx="${r1(x)}" cy="${r1(y)}" r="3.2" fill="${c === 0 ? '#ff6a6a' : c === 1 ? '#ffe08a' : '#fff4d8'}"/>`)
+    }
+  }
+  const icicles: string[] = []
+  for (let k = 0; k < 18; k++) {
+    const x = 1360 + k * 7
+    const len = 6 + hash(k, 80) * 14
+    icicles.push(`<path d="M${x - 2.5} 724L${x + 2.5} 724L${x} ${r1(724 + len)}Z"/>`)
+  }
+  return `<g fill="#e8f2ff" opacity=".9">${icicles.join('')}</g>${bulbs.join('')}`
+}
+
+/** Warm light from the windows spilled on the snow in front of the cabin. */
+function windowSpill(p: Sky): string {
+  return `<ellipse cx="1420" cy="905" rx="170" ry="26" fill="url(#spill)" opacity="${p.window}"/>`
+}
+
+/**
+ * Liquid glass behind the chat: a frosted column with soft sides that blurs the still sky and hills behind it, a faint
+ * sheen from the top and mist at its foot. The scene's edges stay bright and sharp.
+ */
+function glassColumn(p: Sky): string {
+  return `<g mask="url(#colMask)">
+<g filter="url(#frost)"><rect width="1600" height="1000" fill="url(#sky)"/>${mountains(p)}</g>
+<rect width="1600" height="1000" fill="#0a1030" opacity=".42"/>
+<rect width="1600" height="1000" fill="url(#sheen)"/>
+<rect y="760" width="1600" height="240" fill="url(#mist)"/>
+</g>`
+}
+
+/** Snow in three depths: far fine flakes, middle, and big soft near ones; each layer holds its flakes twice, a screen apart, so the loop never shows a seam. */
+function snowfall(s: number, front: boolean): string {
+  const layer = (seed: number, count: number, rMin: number, rSpan: number, cls: string, sway: string, opacity: number, soft: boolean) => {
     const flakes: string[] = []
     for (let i = 0; i < count; i++) {
       const x = Math.round(hash(i, seed) * 1600)
       const y = Math.round(hash(i, seed + 1) * 1000)
       const r = r1(rMin + hash(i, seed + 2) * rSpan)
-      flakes.push(`<circle cx="${x}" cy="${y}" r="${r}"/><circle cx="${x}" cy="${y - 1000}" r="${r}"/>`)
+      const fill = soft ? ' fill="url(#flake)"' : ''
+      flakes.push(`<circle cx="${x}" cy="${y}" r="${r}"${fill}/><circle cx="${x}" cy="${y - 1000}" r="${r}"${fill}/>`)
     }
-    return `<g class="${cls}" fill="#ffffff" opacity="${opacity}"><g class="drift">${flakes.join('')}</g></g>`
+    return `<g class="${cls}" fill="#ffffff" opacity="${opacity}"><g class="${sway}">${flakes.join('')}</g></g>`
   }
-  const near = Math.round(18 + s * 40)
-  const far = Math.round(30 + s * 50)
-  return `${layer(51, far, 1, 1.4, 'fallSlow', 0.6)}${layer(61, near, 2, 2, 'fall', 0.85)}`
+  if (!front) return `${layer(51, Math.round(50 + s * 50), 0.8, 1.2, 'fallSlow', 'drift', 0.55, false)}${layer(61, Math.round(30 + s * 40), 1.6, 1.6, 'fall', 'driftB', 0.8, false)}`
+  return layer(71, Math.round(10 + s * 14), 4, 4, 'fallFast', 'driftC', 0.9, true)
 }
 
 function shootingStar(ctx: SceneCtx): string {
@@ -288,8 +369,9 @@ function scene(ctx: SceneCtx): string {
 .hop{animation:hop .7s ease-in-out infinite}
 .flap{animation:flap .25s ease-in-out infinite alternate}
 .au{animation:au 14s ease-in-out infinite alternate}.au.b{animation-duration:19s}
-.fall{animation:fall 16s linear infinite}.fallSlow{animation:fall 28s linear infinite}
-.drift{animation:drift 6s ease-in-out infinite alternate}
+.fall{animation:fall 16s linear infinite}.fallSlow{animation:fall 30s linear infinite}.fallFast{animation:fall 9s linear infinite}
+.drift{animation:drift 6s ease-in-out infinite alternate}.driftB{animation:driftB 4.5s ease-in-out infinite alternate}.driftC{animation:driftC 3.2s ease-in-out infinite alternate}
+.au.c{animation-duration:23s}
 .shoot{animation:shoot 2.6s ease-in infinite}
 @keyframes tw{from{opacity:.35}to{opacity:1}}
 @keyframes blink{0%{opacity:1}100%{opacity:.2}}
@@ -308,6 +390,8 @@ function scene(ctx: SceneCtx): string {
 @keyframes au{from{transform:translateX(-40px) skewX(-4deg)}to{transform:translateX(40px) skewX(4deg)}}
 @keyframes fall{from{transform:translateY(0)}to{transform:translateY(1000px)}}
 @keyframes drift{from{transform:translateX(-14px)}to{transform:translateX(14px)}}
+@keyframes driftB{from{transform:translateX(20px)}to{transform:translateX(-26px)}}
+@keyframes driftC{from{transform:translateX(-40px)}to{transform:translateX(30px)}}
 @keyframes shoot{0%{transform:translate(1180px,90px);opacity:0}10%{opacity:1}60%{transform:translate(560px,330px);opacity:0}100%{transform:translate(560px,330px);opacity:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}`
   const defs = `${sky(p)}
@@ -325,6 +409,15 @@ function scene(ctx: SceneCtx): string {
 <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a5432"/><stop offset="1" stop-color="#6a3c22"/></linearGradient>
 <linearGradient id="trail" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
 <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.haze}" stop-opacity="0"/><stop offset=".55" stop-color="${p.haze}" stop-opacity=".22"/><stop offset="1" stop-color="${p.haze}" stop-opacity="0"/></linearGradient>
+<radialGradient id="halo0"><stop offset="0" stop-color="#ff5a5a" stop-opacity=".85"/><stop offset=".35" stop-color="#ff5a5a" stop-opacity=".35"/><stop offset="1" stop-color="#ff5a5a" stop-opacity="0"/></radialGradient><radialGradient id="halo1"><stop offset="0" stop-color="#ffd166" stop-opacity=".85"/><stop offset=".35" stop-color="#ffd166" stop-opacity=".35"/><stop offset="1" stop-color="#ffd166" stop-opacity="0"/></radialGradient><radialGradient id="halo2"><stop offset="0" stop-color="#5ee6a0" stop-opacity=".85"/><stop offset=".35" stop-color="#5ee6a0" stop-opacity=".35"/><stop offset="1" stop-color="#5ee6a0" stop-opacity="0"/></radialGradient><radialGradient id="halo3"><stop offset="0" stop-color="#6fb7ff" stop-opacity=".85"/><stop offset=".35" stop-color="#6fb7ff" stop-opacity=".35"/><stop offset="1" stop-color="#6fb7ff" stop-opacity="0"/></radialGradient><radialGradient id="halo4"><stop offset="0" stop-color="#ff9adf" stop-opacity=".85"/><stop offset=".35" stop-color="#ff9adf" stop-opacity=".35"/><stop offset="1" stop-color="#ff9adf" stop-opacity="0"/></radialGradient><radialGradient id="halo5"><stop offset="0" stop-color="#fff2c8" stop-opacity=".85"/><stop offset=".35" stop-color="#fff2c8" stop-opacity=".35"/><stop offset="1" stop-color="#fff2c8" stop-opacity="0"/></radialGradient>
+<radialGradient id="clumpShade" cy=".3"><stop offset="0" stop-color="#b9c4e6"/><stop offset="1" stop-color="#8f9bc8" stop-opacity="0"/></radialGradient>
+<radialGradient id="flake"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#ffffff" stop-opacity=".7"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+<radialGradient id="spill"><stop offset="0" stop-color="#ffcf7a" stop-opacity=".45"/><stop offset="1" stop-color="#ffcf7a" stop-opacity="0"/></radialGradient>
+<linearGradient id="colG" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1600" y2="0"><stop offset=".15" stop-color="#000"/><stop offset=".29" stop-color="#fff"/><stop offset=".71" stop-color="#fff"/><stop offset=".85" stop-color="#000"/></linearGradient>
+<mask id="colMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1600" height="1000"><rect width="1600" height="1000" fill="url(#colG)"/></mask>
+<filter id="frost" filterUnits="userSpaceOnUse" x="0" y="0" width="1600" height="1000"><feGaussianBlur stdDeviation="16"/></filter>
+<linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8d4ff" stop-opacity=".10"/><stop offset=".35" stop-color="#c8d4ff" stop-opacity="0"/></linearGradient>
+<linearGradient id="mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe6ff" stop-opacity="0"/><stop offset="1" stop-color="#dfe6ff" stop-opacity=".22"/></linearGradient>
 <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>`
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><style>${style}</style><defs>${defs}</defs>
 <rect width="1600" height="1000" fill="url(#sky)"/>
@@ -334,20 +427,25 @@ ${aurora(p)}
 ${moonOrSun(p, ctx.phase)}
 ${shootingStar(ctx)}
 ${mountains(p)}
-${backPines(p)}
+${forest()}
+${snowfall(s, false)}
+${windowSpill(p)}
 ${cabin(ctx, p)}
+${cabinTrim(ctx)}
 ${tree(ctx, s)}
 ${gifts()}
 ${lampPost(ctx)}
 ${snowman()}
 ${drifts(p, s)}
+${glassColumn(p)}
 ${signs(ctx, g)}
-${snowfall(s)}
+${snowfall(s, true)}
 </svg>`
 }
 
 function glass(ctx: SceneCtx): { blur: number; tint: string; opacity: number } {
-  return ctx.phase === 'day' ? { blur: 12, tint: '#16224a', opacity: 0.38 } : { blur: 12, tint: '#0a1030', opacity: 0.42 }
+  // The frosted column is drawn in the scene itself, so the veil over the whole window stays light and the edges bright.
+  return ctx.phase === 'day' ? { blur: 16, tint: '#16224a', opacity: 0.12 } : { blur: 16, tint: '#0a1030', opacity: 0.1 }
 }
 
 export const theme: LivingTheme = {
