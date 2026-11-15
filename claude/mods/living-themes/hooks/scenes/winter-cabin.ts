@@ -10,17 +10,17 @@ import type { Gauges, LivingTheme, SceneCtx } from './contract'
 
 type Phase = SceneCtx['phase']
 
-function hash(x: number, y: number): number {
+export function hash(x: number, y: number): number {
   let h = (x * 374761393 + y * 668265263) >>> 0
   h = ((h ^ (h >>> 13)) * 1274126177) >>> 0
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
 
-const r1 = (v: number): number => Math.round(v * 10) / 10
+export const r1 = (v: number): number => Math.round(v * 10) / 10
 
-type Sky = { top: string; mid: string; low: string; haze: string; stars: number; moon: boolean; aurora: boolean; snow: string; snowShade: string; window: number }
+export type Sky = { top: string; mid: string; low: string; haze: string; stars: number; moon: boolean; aurora: boolean; snow: string; snowShade: string; window: number }
 
-const SKIES: Record<Phase, Sky> = {
+export const SKIES: Record<Phase, Sky> = {
   dawn: { top: '#26305f', mid: '#6d5f9a', low: '#e3a9a6', haze: '#f2c6b4', stars: 0.35, moon: false, aurora: false, snow: '#eef0fb', snowShade: '#b9bfe0', window: 0.8 },
   day: { top: '#3d64a0', mid: '#7b9dcb', low: '#c9dbee', haze: '#e6eef8', stars: 0, moon: false, aurora: false, snow: '#f6f9ff', snowShade: '#c4d3ea', window: 0.55 },
   dusk: { top: '#141a44', mid: '#423a7c', low: '#b07393', haze: '#d896a6', stars: 0.7, moon: true, aurora: false, snow: '#e2e4f6', snowShade: '#a3a7d2', window: 1 },
@@ -35,11 +35,11 @@ const GROUND = 905
 const leftDrift = (s: number) => GROUND - s * 150
 const rightDrift = (s: number) => GROUND + 5 - s * 80
 
-function sky(p: Sky): string {
+export function sky(p: Sky): string {
   return `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.top}"/><stop offset="0.55" stop-color="${p.mid}"/><stop offset="1" stop-color="${p.low}"/></linearGradient>`
 }
 
-function stars(p: Sky): string {
+export function stars(p: Sky): string {
   if (p.stars === 0) return ''
   const out: string[] = []
   for (let i = 0; i < 90; i++) {
@@ -51,12 +51,12 @@ function stars(p: Sky): string {
   return `<g fill="#ffffff" opacity="${p.stars}">${out.join('')}</g>`
 }
 
-function aurora(p: Sky): string {
+export function aurora(p: Sky): string {
   if (!p.aurora) return ''
   return `<g opacity=".5"><path class="au c" d="M-40 300C260 230 520 330 780 270S1250 210 1640 290L1640 340C1250 280 1000 360 780 330S260 300 -40 360Z" fill="url(#auG)" opacity=".6"/><path class="au" d="M-40 250C200 150 420 300 700 200S1200 120 1640 230L1640 330C1200 230 960 330 700 300S220 260 -40 350Z" fill="url(#auG)"/><path class="au b" d="M-40 170C300 90 520 220 820 150S1300 90 1640 160L1640 230C1300 170 1060 250 820 220S300 170 -40 250Z" fill="url(#auV)"/></g>`
 }
 
-function moonOrSun(p: Sky, phase: Phase): string {
+export function moonOrSun(p: Sky, phase: Phase): string {
   if (p.moon) {
     return `<circle cx="1440" cy="150" r="90" fill="url(#moonGlow)"/><circle cx="1440" cy="150" r="46" fill="#f4efd9"/><circle cx="1424" cy="138" r="9" fill="#e2dbbd"/><circle cx="1456" cy="166" r="6" fill="#e2dbbd"/><circle cx="1452" cy="132" r="4" fill="#e2dbbd"/>`
   }
@@ -121,7 +121,7 @@ function forest(): string {
 const LIGHT_COLOURS = ['#ff5a5a', '#ffd166', '#5ee6a0', '#6fb7ff', '#ff9adf']
 
 /** A clump of snow: three overlapping rounds with a shaded underside, `r` across. */
-function clump(x: number, y: number, r: number, seed: number): string {
+export function clump(x: number, y: number, r: number, seed: number): string {
   const a = r * (0.55 + hash(seed, 1) * 0.2)
   const b = r * (0.5 + hash(seed, 2) * 0.2)
   return `<ellipse cx="${r1(x)}" cy="${r1(y + r * 0.18)}" rx="${r1(r * 1.05)}" ry="${r1(r * 0.55)}" fill="url(#clumpShade)"/><circle cx="${r1(x - r * 0.45)}" cy="${r1(y)}" r="${r1(a)}" fill="#ffffff"/><circle cx="${r1(x + r * 0.42)}" cy="${r1(y + 1)}" r="${r1(b)}" fill="#ffffff"/><circle cx="${r1(x)}" cy="${r1(y - r * 0.28)}" r="${r1(r * 0.62)}" fill="#ffffff"/>`
@@ -231,8 +231,12 @@ function drifts(p: Sky, s: number): string {
 function cabin(ctx: SceneCtx, p: Sky): string {
   const glowCls = ctx.activity === 'working' ? 'busy' : 'breathe'
   const win = p.window
-  const smokeCls = ctx.activity === 'working' || ctx.activity === 'agents' ? 'smoke fast' : ctx.activity === 'thinking' ? 'smoke' : 'smoke slow'
-  const puffs = Array.from({ length: ctx.activity === 'idle' ? 4 : 7 }, (_, i) => `<circle class="${smokeCls}" style="animation-delay:-${r1((i * 6) / 7)}s" cx="1500" cy="505" r="${10 + (i % 3) * 3}"/>`).join('')
+  const smokeS = ctx.activity === 'working' || ctx.activity === 'agents' ? 3 : ctx.activity === 'thinking' ? 6 : 9
+  const count = ctx.activity === 'idle' ? 4 : 7
+  const puffs = Array.from({ length: count }, (_, i) => {
+    const begin = `-${r1((i * smokeS) / count)}s`
+    return `<circle cx="1500" cy="505" r="10" opacity="0"><animateTransform attributeName="transform" type="translate" values="0 0;-60 -260" dur="${smokeS}s" begin="${begin}" repeatCount="indefinite"/><animate attributeName="r" values="${8 + (i % 3) * 2};${26 + (i % 3) * 4}" dur="${smokeS}s" begin="${begin}" repeatCount="indefinite"/><animate attributeName="opacity" values=".8;0" dur="${smokeS}s" begin="${begin}" repeatCount="indefinite"/></circle>`
+  }).join('')
   const lanterns = Array.from({ length: ctx.activity === 'agents' ? ctx.agents : 0 }, (_, i) => {
     const x = 1366 + i * 27
     return `<g class="sway" style="animation-delay:-${r1(i * 0.37)}s;transform-origin:${x}px 700px"><path d="M${x} 700V712" stroke="#2a1d16" stroke-width="1.5"/><circle cx="${x}" cy="722" r="20" fill="url(#lampGlow)"/><rect x="${x - 6}" y="712" width="12" height="18" rx="3" fill="#ffcf6a"/><rect x="${x - 7}" y="710" width="14" height="3" fill="#2a1d16"/></g>`
@@ -258,7 +262,7 @@ ${errorTint}${lanterns}</g>`
 }
 
 /** The two signs hanging from the top left, the robin on the upper one. */
-function signs(ctx: SceneCtx, g: Gauges): string {
+export function signs(ctx: SceneCtx, g: Gauges): string {
   const ctxText = `${g.context}%`
   const cold = g.cacheMin === null
   const left = g.cacheMin ?? 0
@@ -267,7 +271,8 @@ function signs(ctx: SceneCtx, g: Gauges): string {
   const candleH = r1(6 + 30 * frac)
   const candleTop = r1(296 - candleH)
   const low = !cold && left <= 5
-  const flame = cold ? '' : `<g class="flame" style="transform-origin:120px ${candleTop}px"><ellipse cx="120" cy="${r1(candleTop - 9)}" rx="${low ? 3.5 : 5}" ry="${low ? 6 : 10}" fill="#ffcf5a"/><ellipse cx="120" cy="${r1(candleTop - 6)}" rx="2.2" ry="4" fill="#fff6d8"/></g><circle cx="120" cy="${r1(candleTop - 8)}" r="22" fill="url(#lampGlow)" class="breathe"/>`
+  const fy = low ? 6 : 10
+  const flame = cold ? '' : `<g><ellipse cx="120" cy="${r1(candleTop - 9)}" rx="${low ? 3.5 : 5}" ry="${fy}" fill="#ffcf5a"><animate attributeName="ry" values="${fy};${r1(fy * 1.25)};${r1(fy * 0.9)};${fy}" dur=".9s" repeatCount="indefinite"/><animate attributeName="cy" values="${r1(candleTop - 9)};${r1(candleTop - 11)};${r1(candleTop - 8.5)};${r1(candleTop - 9)}" dur=".9s" repeatCount="indefinite"/></ellipse><ellipse cx="120" cy="${r1(candleTop - 6)}" rx="2.2" ry="4" fill="#fff6d8"/></g><circle cx="120" cy="${r1(candleTop - 8)}" r="22" fill="url(#lampGlow)" class="breathe"/>`
   const robinCls = ctx.activity === 'error' ? 'flap' : ctx.activity === 'success' ? 'hop' : ctx.activity === 'idle' ? '' : 'bob'
   const robin = `<g class="${robinCls}" style="transform-origin:140px 150px">
 <ellipse cx="140" cy="126" rx="30" ry="26" fill="#7a5034"/><ellipse cx="150" cy="132" rx="19" ry="18" fill="#e2552d"/><ellipse cx="146" cy="145" rx="16" ry="8" fill="#f4ece0"/>
@@ -328,9 +333,13 @@ function glassColumn(p: Sky): string {
 </g>`
 }
 
-/** Snow in three depths: far fine flakes, middle, and big soft near ones; each layer holds its flakes twice, a screen apart, so the loop never shows a seam. */
-function snowfall(s: number, front: boolean): string {
-  const layer = (seed: number, count: number, rMin: number, rSpan: number, cls: string, sway: string, opacity: number, soft: boolean) => {
+/**
+ * Snow in three depths: far fine flakes, middle, and big soft near ones; each layer holds its flakes twice, a screen apart,
+ * so the loop never shows a seam. The fall and the sway are SMIL, which every surface runs (the desktop's sandboxed frame
+ * included); a still copy shows instead when the person asks for reduced motion.
+ */
+export function snowfall(s: number, front: boolean): string {
+  const layer = (seed: number, count: number, rMin: number, rSpan: number, fallS: number, swayPx: number, swayS: number, opacity: number, soft: boolean) => {
     const flakes: string[] = []
     for (let i = 0; i < count; i++) {
       const x = Math.round(hash(i, seed) * 1600)
@@ -339,15 +348,18 @@ function snowfall(s: number, front: boolean): string {
       const fill = soft ? ' fill="url(#flake)"' : ''
       flakes.push(`<circle cx="${x}" cy="${y}" r="${r}"${fill}/><circle cx="${x}" cy="${y - 1000}" r="${r}"${fill}/>`)
     }
-    return `<g class="${cls}" fill="#ffffff" opacity="${opacity}"><g class="${sway}">${flakes.join('')}</g></g>`
+    const ease = 'calcMode="spline" keyTimes="0;.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"'
+    const moving = `<g class="motion" fill="#ffffff" opacity="${opacity}"><g><animateTransform attributeName="transform" type="translate" values="0 0;0 1000" dur="${fallS}s" repeatCount="indefinite"/><g><animateTransform attributeName="transform" type="translate" values="${-swayPx} 0;${swayPx} 0;${-swayPx} 0" dur="${swayS}s" repeatCount="indefinite" ${ease}/>${flakes.join('')}</g></g></g>`
+    const still = `<g class="still" display="none" fill="#ffffff" opacity="${opacity}">${flakes.filter((_, i) => i % 2 === 0).join('')}</g>`
+    return moving + still
   }
-  if (!front) return `${layer(51, Math.round(50 + s * 50), 0.8, 1.2, 'fallSlow', 'drift', 0.55, false)}${layer(61, Math.round(30 + s * 40), 1.6, 1.6, 'fall', 'driftB', 0.8, false)}`
-  return layer(71, Math.round(10 + s * 14), 4, 4, 'fallFast', 'driftC', 0.9, true)
+  if (!front) return `${layer(51, Math.round(50 + s * 50), 0.8, 1.2, 30, 14, 12, 0.55, false)}${layer(61, Math.round(30 + s * 40), 1.6, 1.6, 16, 24, 9, 0.8, false)}`
+  return layer(71, Math.round(10 + s * 14), 4, 4, 9, 36, 6.5, 0.9, true)
 }
 
 function shootingStar(ctx: SceneCtx): string {
   if (ctx.activity !== 'success') return ''
-  return `<g class="shoot" transform="translate(860 210)"><path d="M0 0L-160 60" stroke="url(#trail)" stroke-width="3" stroke-linecap="round"/><circle r="3.5" fill="#ffffff"/></g>`
+  return `<g transform="translate(860 210)"><animateTransform attributeName="transform" type="translate" values="1180 90;560 330;560 330" keyTimes="0;.6;1" dur="2.6s" repeatCount="indefinite"/><path d="M0 0L-160 60" stroke="url(#trail)" stroke-width="3" stroke-linecap="round"/><circle r="3.5" fill="#ffffff"/></g>`
 }
 
 function scene(ctx: SceneCtx): string {
@@ -393,7 +405,7 @@ function scene(ctx: SceneCtx): string {
 @keyframes driftB{from{transform:translateX(20px)}to{transform:translateX(-26px)}}
 @keyframes driftC{from{transform:translateX(-40px)}to{transform:translateX(30px)}}
 @keyframes shoot{0%{transform:translate(1180px,90px);opacity:0}10%{opacity:1}60%{transform:translate(560px,330px);opacity:0}100%{transform:translate(560px,330px);opacity:0}}
-@media (prefers-reduced-motion: reduce){*{animation:none!important}}`
+@media (prefers-reduced-motion: reduce){*{animation:none!important}.motion{display:none}.still{display:inline}}`
   const defs = `${sky(p)}
 <linearGradient id="auG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#53f0b0" stop-opacity="0"/><stop offset=".35" stop-color="#53f0b0"/><stop offset=".7" stop-color="#7ad8ff"/><stop offset="1" stop-color="#7ad8ff" stop-opacity="0"/></linearGradient>
 <linearGradient id="auV" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b48cff" stop-opacity="0"/><stop offset=".5" stop-color="#b48cff"/><stop offset="1" stop-color="#53f0b0" stop-opacity="0"/></linearGradient>

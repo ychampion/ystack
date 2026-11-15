@@ -12,6 +12,7 @@ import { theme as rainWindow } from './scenes/rain-window'
 import { theme as orbitOps } from './scenes/orbit-ops'
 import { theme as gardenPlot } from './scenes/garden-plot'
 import { theme as desertCaravan } from './scenes/desert-caravan'
+import { theme as firstSnow } from './scenes/first-snow'
 import { theme as winterCabin } from './scenes/winter-cabin'
 
 export const THEMES: readonly LivingTheme[] = [
@@ -28,6 +29,7 @@ export const THEMES: readonly LivingTheme[] = [
   gardenPlot,
   desertCaravan,
   winterCabin,
+  firstSnow,
 ]
 
 export function themeOf(id: string | undefined): LivingTheme | undefined {
