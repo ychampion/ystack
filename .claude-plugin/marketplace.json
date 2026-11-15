@@ -152,6 +152,10 @@
     {
       "name": "living-themes",
       "source": "./claude/mods/living-themes"
+    },
+    {
+      "name": "transcript-compress",
+      "source": "./claude/mods/transcript-compress"
     }
   ]
 }

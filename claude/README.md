@@ -50,6 +50,7 @@ Most mods wait for a command (`/handoff`, `/why`, `/diet`, `/queue`, …). The o
 | --- | --- | --- |
 | `output-diet` | Build, install and test output over 150 lines is shortened before Claude reads it; errors are kept and the full output is saved to a file. | `enabled` off |
 | `owner-view` | A plain-English caption under each tool row (a small, capped model call for commands it doesn't recognize), a "while you were away" brief after 45 idle minutes, and a suggested next step in the prompt box. | `captions`, `suggestions` off, or raise `awayMinutes` |
+| `transcript-compress` | At most once a week, when 500 MB or more of old transcripts are waiting, a one-line note lets Claude suggest compressing them at a break between tasks. Nothing is compressed unless you say yes, type `/compress-transcripts`, or turn on "Always on". | `suggestAtMB` 0 |
 | `memory-recall` | When a tool call fails, points Claude at the memory note or skill that matches the error. | disable the mod |
 | `session-recovery`, `model-checkup`, `auto-claudeception`, `pin` | Only suggest something in a toast or the prompt box (reopen crashed sessions, run a prompt audit, save a skill, pin a rule). They never act on their own. | disable the mod |
 
@@ -112,6 +113,7 @@ Also in this folder: [`agents/`](agents/) holds the `opus-medium`, `opus-high` a
 | Mod | What it does | Settings |
 | --- | --- | --- |
 | `prompt-diet` | `/diet` shows what every turn sends, largest first, and which tools and skills you actually use. Load rarely used tools on demand, leave out noisy reminders, or shorten the skill listing; nothing becomes unreachable, decisions hold for the session so the prompt cache stays intact, and `/diet restore` undoes it. | `autoDefer`, `unusedSessions`, `compactSkills` (all off) |
+| `transcript-compress` | Compresses Claude transcripts older than a week, in place and lossless, to win back disk space (a heavy user's history runs to gigabytes). Windows and macOS use the file system's own compression, so files stay readable and `/resume` still works; Linux uses gzip, and `/compress-transcripts restore <session-id>` brings one back. Off by default: when 500 MB or more is waiting it lets Claude suggest a run once, at a break between tasks, and runs only on your yes or `/compress-transcripts`. Turn on "Always on" to have it run by itself, at most once a day. `/compress-transcripts status` shows what's waiting. | `autoCompress` (off), `minAgeDays` (7), `suggestAtMB` (500) |
 | `output-diet` | Shortens long build, install, test and lint output before Claude reads it: strips progress bars, collapses repeats, keeps every error with context. Everything else (file reads, diffs, searches, queries, scripts) passes through whole, and the full output is always saved to a file Claude can read. `/output-diet`. | `enabled`, `maxLines` (150) |
 
 ## For the owner

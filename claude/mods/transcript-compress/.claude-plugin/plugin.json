@@ -1,0 +1,28 @@
+{
+  "name": "transcript-compress",
+  "version": "0.1.0",
+  "description": "Compresses old Claude transcripts in place to free disk space, losslessly: Windows and macOS use the file system's own compression, so /resume still works. Off by default: Claude suggests it at a natural break when a lot is waiting, or turn on Always on.",
+  "author": {
+    "name": "ychampion"
+  },
+  "userConfig": {
+    "autoCompress": {
+      "type": "boolean",
+      "title": "Always on",
+      "description": "Compress old transcripts by itself, at most once a day, a few seconds after a session starts. Off: nothing runs until you say yes or type /compress-transcripts.",
+      "default": false
+    },
+    "minAgeDays": {
+      "type": "number",
+      "title": "Minimum age (days)",
+      "description": "Only transcripts untouched for at least this many days are compressed.",
+      "default": 7
+    },
+    "suggestAtMB": {
+      "type": "number",
+      "title": "Suggest from (MB)",
+      "description": "Claude suggests a run, at most once a week, when old transcripts waiting add up to this many MB. 0 never suggests.",
+      "default": 500
+    }
+  }
+}

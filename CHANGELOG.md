@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- New mod `transcript-compress`: compresses Claude transcripts older than a week, losslessly, to free disk space (Windows and macOS file-system compression, so `/resume` still works; gzip with a restore command on Linux). Off by default: Claude suggests it at a break when 500 MB or more is waiting; `/compress-transcripts` runs it; an "Always on" setting runs it daily. The `ystack` bundle includes it.
 - New mod `living-themes`: twelve animated backdrops for the desktop app that react to what Claude is doing (thinking, tools, subagents, a failure, a merge) and follow your local time of day and season. `/live-theme` picks one; nothing changes until you do. The `ystack` bundle (0.1.1) includes it.
 - 12 new skills of our own: `debug-loop`, `flaky-test`, `perf-loop`, `dep-upgrade`, `migration-plan`, `secure-diff`, `repo-map`, `release-notes`, `postmortem`, `grill`, `agent-writing`, `eval-judge`. Short, for agents to act on; `debug-loop` and `flaky-test` were tried on planted bugs by headless agents.
 - 18 skills from other open collections, each with its licence and a NOTICE of changes: `diagnosing-bugs`, `tdd`, `prototype`, `grilling`, `to-spec`, `to-tickets`, `wayfinder`, `to-questionnaire`, `research`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `writing-for-agents`, `teach`, `retro`, `wizard`, `pr` and `migrate-to-rust` (whose report page now escapes the text it shows).
@@ -15,7 +16,7 @@
 - Long-sessions doc: how the one-hour cache cliff differs from compaction.
 - `self-learning` plugin joins ystack: `/learn <topic>` turns a technology's docs into a reusable skill. Its agents now use your session's model, skills are saved only where updates can't overwrite them, and its command metadata parses again.
 - Engineering workflow skills: `blast-radius`, `interrogate`, `arena`, `recall`.
-- `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 35 mods in one go.
+- `ystack` bundle: `/plugin install ystack --marketplace ychampion/ystack` installs all 36 mods in one go.
 - README: install everything first, then a grouped list of the mods to pick from, and how to update (auto-update or by hand).
 
 ## 0.1.0 (2026-11-14): first public release
