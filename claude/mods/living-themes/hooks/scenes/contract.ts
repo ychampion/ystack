@@ -25,6 +25,16 @@ export type SceneCtx = {
   season: Season
   /** Subagents running now, 0 to 5 (capped). Above 0 only when activity is 'agents', 'working' or 'thinking'. */
   agents: number
+  /** Live session readings, given only to a theme that sets `gauges: true`. */
+  gauges?: Gauges
+}
+
+/** The session's own numbers a gauge theme draws. */
+export type Gauges = {
+  /** How full the context window is, 0 to 100, whole percent. */
+  context: number
+  /** Whole minutes left before the prompt cache goes cold, 0 to 999; null when it is cold (a new session, a compaction). */
+  cacheMin: number | null
 }
 
 export type LivingTheme = {
@@ -40,6 +50,8 @@ export type LivingTheme = {
    * night (the mod then switches the app's colour scheme with it).
    */
   window: 'light' | 'dark' | 'auto'
+  /** True when the scene draws the session's gauges (context fill, cache time left): the mod then reads and sends them. */
+  gauges?: true
   /** The veil over the scene, for the given moment (it may differ by phase). */
   glass: (ctx: SceneCtx) => ThemeBackdropGlass
   /** The whole scene for the given moment. Pure and deterministic: the same ctx gives the same string. */

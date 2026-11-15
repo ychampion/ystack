@@ -96,14 +96,17 @@ const SEP = '_'
 export const NAME_LIMIT = 64
 
 export function encodeScene(id: string, ctx: SceneCtx): string {
-  return [id, ctx.activity, ctx.phase, ctx.season, String(ctx.agents)].join(SEP)
+  const parts = [id, ctx.activity, ctx.phase, ctx.season, String(ctx.agents)]
+  // A gauge theme's readings ride in two more parts: c<context %> and m<cache minutes> (mx when the cache is cold).
+  if (ctx.gauges !== undefined) parts.push(`c${ctx.gauges.context}`, `m${ctx.gauges.cacheMin === null ? 'x' : ctx.gauges.cacheMin}`)
+  return parts.join(SEP)
 }
 
 /** A scene name back to its theme id and moment; undefined for any name this mod did not make. */
 export function decodeScene(name: string): { id: string; ctx: SceneCtx } | undefined {
   const parts = name.split(SEP)
-  if (parts.length !== 5) return undefined
-  const [id, activity, phase, season, agents] = parts as [string, string, string, string, string]
+  if (parts.length !== 5 && parts.length !== 7) return undefined
+  const [id, activity, phase, season, agents, c, m] = parts as [string, string, string, string, string, string?, string?]
   const n = Number(agents)
   if (
     !/^[a-z0-9-]+$/.test(id) ||
@@ -114,7 +117,24 @@ export function decodeScene(name: string): { id: string; ctx: SceneCtx } | undef
   ) {
     return undefined
   }
-  return { id, ctx: { activity: activity as Activity, phase: phase as Phase, season: season as Season, agents: n } }
+  const ctx: SceneCtx = { activity: activity as Activity, phase: phase as Phase, season: season as Season, agents: n }
+  if (c === undefined || m === undefined) return { id, ctx }
+  const context = /^c(\d{1,3})$/.exec(c)
+  const cache = /^m(x|\d{1,3})$/.exec(m)
+  if (!context || !cache || Number(context[1]) > 100) return undefined
+  return { id, ctx: { ...ctx, gauges: { context: Number(context[1]), cacheMin: cache[1] === 'x' ? null : Number(cache[1]) } } }
+}
+
+/** The context fill as a whole percent, 0 to 100, from what the engine reports (missing: 0). */
+export function contextPercent(percent: number | undefined, tokens: number | undefined, window: number | undefined): number {
+  const raw = typeof percent === 'number' && Number.isFinite(percent) ? percent : tokens && window ? (tokens / window) * 100 : 0
+  return Math.max(0, Math.min(100, Math.round(raw)))
+}
+
+/** Whole minutes until the cache goes cold at `warmUntil`, rounded up; null when it is already cold or never warmed. */
+export function cacheMinutesLeft(warmUntil: number | undefined, now: number): number | null {
+  if (warmUntil === undefined || warmUntil <= now) return null
+  return Math.min(999, Math.ceil((warmUntil - now) / 60_000))
 }
 
 /** A wait on some clock: the engine's `$.clock.after`, or a test's. */

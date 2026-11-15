@@ -9,6 +9,8 @@ import {
   FLASH_MS,
   SUCCESS_WORDS,
   activityOf,
+  cacheMinutesLeft,
+  contextPercent,
   decodeScene,
   encodeScene,
   localTime,
@@ -34,8 +36,8 @@ const COMMAND = 'live-theme'
 const PREVIEW_MS = 20_000
 /** At most one backdrop change in this long: a burst of tool calls lands as one change, on the latest moment. */
 export const GAP_MS = 1500
-/** How often the time of day and the season are read again. */
-const TICK_MS = 5 * 60_000
+/** How often the moment is read again: the time of day, the season and a gauge theme's cache minutes. Unchanged costs nothing. */
+const TICK_MS = 60_000
 /** How often the running subagents are counted while any run (their end has no event of its own on every engine). */
 const AGENT_POLL_MS = 4000
 // The store, shared by every session: the default theme's id, and 'on' where the person asked for calm.
@@ -66,7 +68,9 @@ let agentPoll: Timer | undefined
 let flashEnding: Timer | undefined
 let previewEnding: Timer | undefined
 let pushing: Promise<void> = Promise.resolve()
-let settings = { offset: undefined as number | undefined, hemisphere: 'north' as 'north' | 'south', reactToAgent: true }
+let settings = { offset: undefined as number | undefined, hemisphere: 'north' as 'north' | 'south', reactToAgent: true, cacheMs: 60 * 60_000 }
+/** When the prompt cache goes cold: pushed out by every model call of the main loop, gone at a compaction. */
+let cacheWarmUntil: number | undefined
 
 /** The engine's way is not this one: a missing call (TypeError) or a shape it says it does not know. */
 function isNotThisEnginesWay(error: unknown, member?: string): boolean {
@@ -221,10 +225,25 @@ async function isCalm($: EngineInterface): Promise<boolean> {
 }
 
 /** The whole moment at `now`. */
-async function momentAt($: EngineInterface, now: number): Promise<SceneCtx> {
+async function momentAt($: EngineInterface, now: number, theme?: LivingTheme): Promise<SceneCtx> {
   const { activity, agents } = activityOf(tracker, now, await isCalm($))
   const { hour, month } = localTime(now, settings.offset)
-  return { activity, phase: phaseOf(hour), season: seasonOf(month, settings.hemisphere), agents }
+  const ctx: SceneCtx = { activity, phase: phaseOf(hour), season: seasonOf(month, settings.hemisphere), agents }
+  if (theme?.gauges !== true) return ctx
+  // Gauges show even when calm: they are the session's numbers, not its activity.
+  let context = 0
+  try {
+    const usage = (await $.session.usage()).context
+    context = contextPercent(usage.percent, usage.tokens, usage.window)
+  } catch {
+    // No reading: an empty gauge.
+  }
+  return { ...ctx, gauges: { context, cacheMin: cacheMinutesLeft(cacheWarmUntil, now) } }
+}
+
+/** A model call just ran in the main loop: the cache holds for another full lifetime from now. */
+async function warm($: EngineInterface): Promise<void> {
+  cacheWarmUntil = (await $.clock.now()) + settings.cacheMs
 }
 
 /** Whether any surface of this session draws a backdrop: none in a headless run, none in a terminal. */
@@ -258,7 +277,7 @@ function ioOf($: EngineInterface): CoalescerIo {
 async function push($: EngineInterface): Promise<void> {
   const theme = await standingTheme($)
   if (theme === undefined || !(await drawsBackdrops($))) return
-  const ctx = await momentAt($, await $.clock.now())
+  const ctx = await momentAt($, await $.clock.now(), theme)
   await coalescer.offer(encodeScene(theme.id, ctx), ioOf($))
 }
 
@@ -472,6 +491,7 @@ export const register: Register = (on, options) => {
     offset: parseOffset(options.utcOffset),
     hemisphere: options.hemisphere === 'south' ? 'south' : 'north',
     reactToAgent: options.reactToAgent !== false,
+    cacheMs: (typeof options.cacheMinutes === 'number' && options.cacheMinutes >= 1 ? Math.min(999, options.cacheMinutes) : 60) * 60_000,
   }
 
   on('session.start', async ($, e, next) => {
@@ -497,6 +517,7 @@ export const register: Register = (on, options) => {
 
   on('prompt.submit', async ($, e, next) => {
     tracker = onPromptSubmit(tracker)
+    await quietly($, () => warm($))
     void refresh($)
     return next(e)
   })
@@ -505,6 +526,7 @@ export const register: Register = (on, options) => {
     // A subagent's own calls show as the subagents running, not as tool work of the main loop.
     if (e.agentId !== undefined) return next(e)
     tracker = onToolStart(tracker)
+    await quietly($, () => warm($))
     void refresh($)
     let isError = false
     try {
@@ -535,10 +557,19 @@ export const register: Register = (on, options) => {
   on('turn.complete', async ($, e, next) => {
     if (e.agentId === undefined) {
       tracker = onTurnComplete(tracker)
+      await quietly($, () => warm($))
       void quietly($, () => countAgents($))
       void refresh($)
     }
     return next(e)
+  })
+
+  // A compaction starts a new conversation: its cache is cold until the next call writes it.
+  on('session.compact', async ($, e, next) => {
+    const result = await next(e)
+    cacheWarmUntil = undefined
+    void refresh($)
+    return result
   })
 
   // Every block of the model's reply comes through here once, as text, before it is stored.
