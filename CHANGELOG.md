@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `image-theme` 0.1.1: uses only local, absolute picture paths (never network or device paths, which could send Windows credentials to another machine), and on Linux tells ImageMagick which kind of picture to read from the extension.
+
 ## 0.1.1 (2026-11-16)
 
 - New mod `image-theme`: `/image-theme` turns any picture you choose into your Claude theme. The picture becomes the desktop app background, softly veiled, with a frosted column behind the chat on Windows, and the theme colours come from it (surface tint, accent, light or dark). Works on Windows, macOS and Linux (ImageMagick); Claude can set it for you too. The `ystack` bundle (0.1.2) includes it.

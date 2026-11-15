@@ -1,6 +1,6 @@
 {
   "name": "image-theme",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Turns a picture you choose into your Claude theme: the picture becomes the app background, softly veiled with a frosted column behind the chat, and the theme colours are taken from it. /image-theme opens a file picker.",
   "author": {
     "name": "ychampion"

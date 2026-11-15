@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { cleanPath, colorInputs, paletteOf, parseArgs, pictureId, readBmp, toHsl, veilColor } from '../hooks/core'
+import { cleanPath, coderOf, colorInputs, paletteOf, parseArgs, pictureId, readBmp, toHsl, veilColor } from '../hooks/core'
 import type { Rgb } from '../hooks/core'
 import { makeColors } from '../hooks/make-colors.js'
 
@@ -119,6 +119,13 @@ test('cleans a pasted path and keeps only pictures', () => {
   expect(cleanPath('  "C:\\Users\\a\\My Pics\\x.JPG" ', 'C:/Users/a')).toBe('C:\\Users\\a\\My Pics\\x.JPG')
   expect(cleanPath("'~/Pictures/sea.png'", '/home/a/')).toBe('/home/a/Pictures/sea.png')
   expect(cleanPath('notes.txt', '/home/a')).toBeUndefined()
+  expect(cleanPath('\\\\server\\share\\x.jpg', 'C:/Users/a')).toBeUndefined()
+  expect(cleanPath('//server/share/x.jpg', '/home/a')).toBeUndefined()
+  expect(cleanPath('\\\\?\\C:\\x.jpg', 'C:/Users/a')).toBeUndefined()
+  expect(cleanPath('-write.png', '/home/a')).toBeUndefined()
+  expect(cleanPath('pics/x.png', '/home/a')).toBeUndefined()
+  expect(coderOf('/a/B.JPG')).toBe('jpeg')
+  expect(coderOf('/a/b.tif')).toBe('tiff')
   expect(cleanPath('', '/home/a')).toBeUndefined()
 })
 

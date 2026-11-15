@@ -161,12 +161,24 @@ export function veilColor(p: Palette): string {
 
 const EXTS = /\.(jpe?g|png|bmp|gif|tiff?|webp|heic)$/i
 
-/** A path as typed: quotes off, ~ to home, backslashes kept. Undefined when it names no picture. */
+/**
+ * A path as typed: quotes off, ~ to home, backslashes kept. Undefined unless it is a local, absolute path to a picture:
+ * a network or device path (\\server\share, //server, \\?\) would make Windows reach out to that machine with the
+ * person's credentials, and a relative one or one starting with "-" could be read as something else by the tools.
+ */
 export function cleanPath(raw: string, home: string): string | undefined {
   let p = raw.trim()
   if ((p.startsWith('"') && p.endsWith('"')) || (p.startsWith("'") && p.endsWith("'"))) p = p.slice(1, -1).trim()
   if (p.startsWith('~')) p = home.replace(/[\\/]+$/, '') + p.slice(1)
-  return p && EXTS.test(p) ? p : undefined
+  if (!p || /^[\\/]{2}/.test(p)) return undefined
+  const local = /^[A-Za-z]:[\\/]/.test(p) || p.startsWith('/')
+  return local && EXTS.test(p) ? p : undefined
+}
+
+/** ImageMagick's reader for a picture, named from its extension, so the file is never read as another kind. */
+export function coderOf(path: string): string {
+  const ext = (path.match(EXTS)?.[1] ?? '').toLowerCase()
+  return ext === 'jpg' ? 'jpeg' : ext === 'tif' ? 'tiff' : ext
 }
 
 /** A short id for a picture: its path, size and time, so the same file twice keeps one name and a new one gets another. */

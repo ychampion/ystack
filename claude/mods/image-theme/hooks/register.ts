@@ -1,6 +1,6 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { cleanPath, colorInputs, fromBase64, paletteOf, parseArgs, pictureId, readBmp, veilColor } from './core'
+import { cleanPath, coderOf, colorInputs, fromBase64, paletteOf, parseArgs, pictureId, readBmp, veilColor } from './core'
 import type { Palette } from './core'
 import { makeColors } from './make-colors.js'
 
@@ -90,7 +90,7 @@ async function swatch($: EngineInterface, p: Platform, src: string, tmp: string)
       ? await ps($, ['-Mode', 'swatch', '-In', native(p, src), '-Out', native(p, tmp)])
       : p === 'mac'
         ? await $.process.run(['sips', '-z', '16', '16', '-s', 'format', 'bmp', src, '--out', tmp], { timeoutMs: STEP_MS })
-        : await magick($, [src, '-auto-orient', '-resize', '16x16!', '-type', 'TrueColor', `BMP3:${tmp}`])
+        : await magick($, [`${coderOf(src)}:${src}`, '-auto-orient', '-resize', '16x16!', '-type', 'TrueColor', `BMP3:${tmp}`])
   const err = failed(r, 'read the picture')
   if (err) throw new Error(err)
   const { base64 } = await $.fs.read(tmp, { as: 'bytes' })
@@ -129,7 +129,7 @@ async function bake($: EngineInterface, p: Platform, src: string, out: string, p
   }
   await $.process.run(['mkdir', '-p', out.replace(/\/[^/]*$/, '')])
   for (const [size, q] of [['2560x4096>', '82'], ['2560x4096>', '64'], ['1920x3072>', '62'], ['1440x2304>', '55']] as const) {
-    const r = await magick($, [src, '-auto-orient', '-resize', size, '-fill', tint, '-colorize', `${Math.round(veil * 100)}%`, '-strip', '-quality', q, `JPEG:${out}`])
+    const r = await magick($, [`${coderOf(src)}:${src}`, '-auto-orient', '-resize', size, '-fill', tint, '-colorize', `${Math.round(veil * 100)}%`, '-strip', '-quality', q, `JPEG:${out}`])
     const err = failed(r, 'make the background')
     if (err) throw new Error(err)
     if ((await $.fs.stat(out)).size <= 1_000_000) return
@@ -174,7 +174,7 @@ async function usePicture($: EngineInterface, raw: string): Promise<string> {
   const p = await platformOf($)
   const home = await homeOf($)
   const path = cleanPath(raw, home)
-  if (!path) return `image-theme: "${raw.trim().slice(0, 120)}" is not a picture path (JPEG, PNG, BMP, GIF or TIFF).`
+  if (!path) return `image-theme: "${raw.trim().slice(0, 120)}" is not a full path to a picture on this computer (JPEG, PNG, BMP, GIF or TIFF; network paths are not used).`
   const info = await $.fs.stat(path).catch(() => undefined)
   if (!info || info.kind !== 'file') return `image-theme: no file at ${path}.`
   const id = pictureId(path, info.size, info.mtimeMs)
