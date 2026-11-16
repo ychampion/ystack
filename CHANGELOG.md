@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `image-theme` 0.1.2: pictures GDI+ can't open (WebP, and HEIC or AVIF with their Microsoft Store codecs) now work on Windows through Windows Imaging Component; when a picture really can't be read, the message says why in one line instead of a PowerShell error, and toasts no longer repeat the mod's name.
 - `image-theme` 0.1.1: uses only local, absolute picture paths (never network or device paths, which could send Windows credentials to another machine), and on Linux tells ImageMagick which kind of picture to read from the extension.
 
 ## 0.1.1 (2026-11-16)

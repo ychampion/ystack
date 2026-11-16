@@ -57,7 +57,9 @@ function ps($: EngineInterface, args: string[], timeoutMs = STEP_MS) {
 
 function failed(r: { exitCode: number; stderr: string }, what: string): string | undefined {
   if (r.exitCode === 0) return undefined
-  const why = r.stderr.trim().split('\n').find(l => l.trim()) ?? `exit ${r.exitCode}`
+  // The helper prints one plain line; PowerShell's own error lines name the script, so skip those.
+  const lines = r.stderr.split('\n').map(l => l.trim()).filter(Boolean)
+  const why = lines.find(l => !/\.ps1\s*:|^At line|^[+~]|CategoryInfo|FullyQualifiedErrorId/.test(l)) ?? lines[0] ?? `exit ${r.exitCode}`
   return `image-theme: could not ${what}: ${why.slice(0, 240)}`
 }
 
@@ -241,8 +243,8 @@ async function answer($: EngineInterface, args: string): Promise<{ text: string 
       }
       return usePicture($, path)
     }).then(text => {
-      $.ui.toast(text, { timeoutMs: 10_000 })
-      $.ui.log(text)
+      $.ui.toast(bare(text), { timeoutMs: 10_000 })
+      $.ui.log(bare(text))
     })
   })
   return { text: want.kind === 'pick' ? 'image-theme: choose a picture in the window that just opened.' : 'image-theme: making your theme from that picture…' }

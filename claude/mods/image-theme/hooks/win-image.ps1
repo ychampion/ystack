@@ -15,10 +15,36 @@ param(
   [int]$Column = 1
 )
 $ErrorActionPreference = 'Stop'
+# Any failure: one plain line on stderr, for the mod to show as it is.
+trap { $m = $_.Exception; while ($m.InnerException) { $m = $m.InnerException }; [Console]::Error.WriteLine(($m.Message -replace '^Exception calling .*?: "|"$', '')); exit 1 }
 
 function Color-Of([string]$hex, [int]$alpha) {
   $h = $hex.TrimStart('#')
   return [System.Drawing.Color]::FromArgb($alpha, [Convert]::ToInt32($h.Substring(0, 2), 16), [Convert]::ToInt32($h.Substring(2, 2), 16), [Convert]::ToInt32($h.Substring(4, 2), 16))
+}
+
+# Opens a picture without locking it. GDI+ first; for what it can't read (WebP, HEIC, AVIF: it answers "Out of
+# memory"), Windows Imaging Component, which uses every codec installed on the machine.
+function Open-Picture([string]$path) {
+  Add-Type -AssemblyName System.Drawing
+  $bytes = [System.IO.File]::ReadAllBytes($path)
+  try {
+    return [System.Drawing.Image]::FromStream((New-Object System.IO.MemoryStream (, $bytes)))
+  } catch {
+    Add-Type -AssemblyName PresentationCore, WindowsBase
+    try {
+      $decoder = [System.Windows.Media.Imaging.BitmapDecoder]::Create((New-Object System.IO.MemoryStream (, $bytes)), 'IgnoreColorProfile', 'OnLoad')
+    } catch {
+      throw "Windows can't read this picture's format. Save it as JPEG or PNG, or install the codec for it (HEIF or AV1 Image Extensions from the Microsoft Store)."
+    }
+    $frame = New-Object System.Windows.Media.Imaging.FormatConvertedBitmap ($decoder.Frames[0], [System.Windows.Media.PixelFormats]::Bgr24, $null, 0)
+    $png = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
+    $png.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($frame))
+    $out = New-Object System.IO.MemoryStream
+    $png.Save($out)
+    $out.Position = 0
+    return [System.Drawing.Image]::FromStream($out)
+  }
 }
 
 function Save-Jpeg([System.Drawing.Bitmap]$bmp, [string]$path, [long]$quality) {
@@ -40,7 +66,7 @@ switch ($Mode) {
   }
   'swatch' {
     Add-Type -AssemblyName System.Drawing
-    $src = [System.Drawing.Image]::FromFile($In)
+    $src = Open-Picture $In
     try {
       $bmp = New-Object System.Drawing.Bitmap 16, 16, ([System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
       $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -54,7 +80,7 @@ switch ($Mode) {
   }
   'bake' {
     Add-Type -AssemblyName System.Drawing
-    $src = [System.Drawing.Image]::FromFile($In)
+    $src = Open-Picture $In
     try {
       # EXIF orientation: turn the picture upright before anything else.
       if ($src.PropertyIdList -contains 0x0112) {
