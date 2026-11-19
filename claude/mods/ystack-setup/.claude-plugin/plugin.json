@@ -1,6 +1,6 @@
 {
   "name": "ystack-setup",
-  "version": "0.2.0",
+  "version": "0.1.2",
   "description": "/ystack-setup lists recommended Claude Code settings (auto-compact windows, two subagent types, agent teams off, subagent model), shows which are already in place, and applies only the ones you tick when you press Apply, with backups and Undo. /ystack-setup check prints a text report. It also keeps ystack current: at each start or /reload-plugins it pulls a newer ystack, refreshes the skills and guards of every agent that has them, and updates the ystack mods (/ystack-setup update runs it now).",
   "author": {
     "name": "ychampion"
