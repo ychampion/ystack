@@ -1,7 +1,7 @@
 {
   "name": "ystack-setup",
-  "version": "0.1.1",
-  "description": "/ystack-setup lists recommended Claude Code settings (auto-compact windows, two subagent types, agent teams off, subagent model), shows which are already in place, and applies only the ones you tick when you press Apply, with backups and Undo. /ystack-setup check prints a text report.",
+  "version": "0.2.0",
+  "description": "/ystack-setup lists recommended Claude Code settings (auto-compact windows, two subagent types, agent teams off, subagent model), shows which are already in place, and applies only the ones you tick when you press Apply, with backups and Undo. /ystack-setup check prints a text report. It also keeps ystack current: at each start or /reload-plugins it pulls a newer ystack, refreshes the skills and guards of every agent that has them, and updates the ystack mods (/ystack-setup update runs it now).",
   "author": {
     "name": "ychampion"
   },
@@ -12,6 +12,12 @@
       "title": "Haiku model id",
       "description": "The Haiku model the 100k auto-compact item sets. ANTHROPIC_DEFAULT_HAIKU_MODEL, when set, wins over this.",
       "default": "claude-haiku-5-5"
+    },
+    "autoUpdate": {
+      "type": "boolean",
+      "title": "Update ystack automatically",
+      "description": "At each start and /reload-plugins: pull a newer ystack checkout (fast-forward only, never over local changes), re-run its setup for the agents that have ystack, and update the installed ystack mods. Turn off to update only with /ystack-upgrade.",
+      "default": true
     }
   }
 }

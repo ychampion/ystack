@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { AgentEdit, ApplyRecord, SettingEdit } from '../types'
 import { AGENTS, type Ctx, ITEMS, KEEP, type Settings, type State, SUBAGENT_MODELS, agentState, effectivePick, get, modelId } from './items.ts'
 import { isEmptyObject, rawAt, removeAt, sameJson, setAt } from './jsonedit.ts'
+import { autoUpdate, type Io } from './autoupdate.ts'
 
 const PANE = 'ystack-setup'
 const STACK = 'undo-stack'
@@ -13,7 +14,7 @@ const pick = atom({ plugin: 'ystack-setup', key: 'pick' } as const, '' as string
 const message = atom({ plugin: 'ystack-setup', key: 'message' } as const, '' as string, { shape: 'message-1' })
 const undoable = atom({ plugin: 'ystack-setup', key: 'undoable' } as const, 0 as number, { shape: 'undoable-1' })
 
-type Options = { haikuModel?: string }
+type Options = { haikuModel?: string; autoUpdate?: boolean }
 type Loaded = { ctx: Ctx; dir: string; settingsPath: string; raw?: string; text?: string; bom: string; error?: string }
 
 const BOM = '﻿'
@@ -293,16 +294,64 @@ async function choose($: EngineInterface, model: string) {
   await update($, pick, () => model)
 }
 
+async function engineIo($: EngineInterface): Promise<Io> {
+  // OS is Windows_NT on every Windows machine (older Claude Code builds have no $.session.machine).
+  const isWindows = (await $.env.get('OS')) === 'Windows_NT'
+  return {
+    run: (argv, init) => $.process.run(argv, init),
+    exists: p => $.fs.exists(p).catch(() => false),
+    read: async p => {
+      if (!(await $.fs.exists(p).catch(() => false))) return undefined
+      const t = await $.fs.read(p)
+      return typeof t === 'string' ? t : undefined
+    },
+    list: async d => (await $.fs.list(d)).map(x => x.name),
+    realPath: async p => (await $.fs.stat(p, { resolve: true })).realPath,
+    env: n => {
+      switch (n) {
+        case 'HOME': return $.env.get('HOME')
+        case 'USERPROFILE': return $.env.get('USERPROFILE')
+        case 'CODEX_HOME': return $.env.get('CODEX_HOME')
+        case 'APPDATA': return $.env.get('APPDATA')
+        case 'LOCALAPPDATA': return $.env.get('LOCALAPPDATA')
+        case 'ProgramFiles': return $.env.get('ProgramFiles')
+        case 'CLAUDE_CODE_GIT_BASH_PATH': return $.env.get('CLAUDE_CODE_GIT_BASH_PATH')
+        case 'GIT_SSH_COMMAND': return $.env.get('GIT_SSH_COMMAND')
+      }
+    },
+    isWindows,
+    get: k => $.store.get(k),
+    set: (k, v) => $.store.set(k, v),
+    now: () => $.clock.now(),
+  }
+}
+
+/** Runs one auto-update pass and shows what changed; errors go to a toast, never into the session. */
+async function runAutoUpdate($: EngineInterface, force: boolean): Promise<string | undefined> {
+  try {
+    const said = await autoUpdate(await engineIo($), { force })
+    if (said) $.ui.toast(said, { timeoutMs: 15_000 })
+    return said
+  } catch (err) {
+    const msg = `ystack auto-update failed: ${err instanceof Error ? err.message : String(err)}`
+    $.ui.toast(msg, { timeoutMs: 15_000 })
+    return msg
+  }
+}
+
 export const register: Register = (on, options) => {
   const opts = options as Options
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'ystack-setup', description: 'Recommended Claude Code settings: tick, Apply, Undo. "/ystack-setup check" prints a report' })
+    await $.command.register({ name: 'ystack-setup', description: 'Recommended Claude Code settings: tick, Apply, Undo. "/ystack-setup check" prints a report; "/ystack-setup update" updates ystack now' })
+    // In the background, so the session never waits on git or the network. A reload runs this again.
+    if (opts.autoUpdate !== false && e.isInteractive) void runAutoUpdate($, false)
     return next(e)
   })
 
   on('command.run', { command: 'ystack-setup' }, async ($, e) => {
     if (e.args.trim() === 'check') return { text: await report($, opts) }
+    if (e.args.trim() === 'update') return { text: (await runAutoUpdate($, true)) ?? 'ystack is up to date: nothing to pull, refresh or update.' }
     const n = (await readStack($)).length
     await update($, undoable, () => n)
     await $.ui.open({ id: PANE, title: 'ystack setup' })

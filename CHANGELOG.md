@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `ystack-setup` 0.2.0: ystack updates itself. At each Claude Code start and `/reload-plugins` it pulls a newer ystack checkout in the background (fast-forward only, never over local changes), re-runs setup for every agent that already has ystack (Claude Code, Codex, OpenCode, Antigravity, Devin), and updates the installed ystack mods whose version changed; one line says what changed. `/ystack-setup update` runs it now; the `autoUpdate` option turns it off.
+- `./setup --host installed`: only the agents that already hold skills from this checkout.
 - Devin support (Devin Desktop and the `devin` CLI): `./setup` finds Devin (or `--host devin`), installs ystack's skills into Devin's own skills folder, and installs `ystack-guards` as a Devin plugin (`devin/plugins/ystack-guards`) with `push-guard`, `package-bouncer` and `verify` as Devin hooks, registered with `devin plugins install --local` (setup prints the command if the CLI isn't logged in). The guards are the Antigravity scripts, run with `--host devin`; a test keeps the two copies identical. Checked live in Devin: a force-push to `main` and a made-up npm package were refused, and an edit with no test was sent back once for a check.
 - `ystack-guards` (Antigravity): the guards did nothing when their folder was reached through a symlink, which is how `./setup` installs them on macOS and Linux, because the "am I the script being run" check compared the link's path with the resolved one. It now compares real paths.
 - `/ystack-upgrade` now re-runs setup for Antigravity and Devin as well as Claude Code, Codex and OpenCode, so their copies pick up the new version.

@@ -49,7 +49,13 @@ Each mod is independent. What each one does, with its settings: [`claude/README.
 
 ## Update
 
-Turn on auto-update once: `/plugin`, then Marketplaces, `ystack`, Enable auto-update. Claude Code then keeps the marketplace and every installed mod current.
+ystack updates itself. With the `ystack-setup` mod installed (it comes with the bundle and the starter set), every Claude Code start and every `/reload-plugins` checks for a newer ystack in the background:
+
+- it pulls your checkout when the remote has something newer (fast-forward only; never over local changes, which it tells you about instead);
+- it re-runs setup for every agent that already has ystack skills (Claude Code, Codex, OpenCode, Antigravity, Devin), so their copies follow too;
+- it updates the installed ystack mods whose version changed.
+
+One line tells you what changed; restart or `/reload-plugins` to load updated mods. `/ystack-setup update` runs it now. To turn it off, set the mod's `autoUpdate` option to off (`/plugin`, `ystack-setup`, Configure).
 
 Or update by hand:
 

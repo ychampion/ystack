@@ -23,7 +23,8 @@ type Setup = { files?: Record<string, string>; model?: string; env?: Record<stri
 
 async function setup($: $T, on: OnT, { files = {}, model = 'claude-opus-9-9[1m]', env = {}, store = {}, failWrite }: Setup = {}) {
   const fs = new Map(Object.entries(files))
-  const kept = new Map(Object.entries(store))
+  // A run just now: the auto-update cooldown keeps these settings tests away from git and the network.
+  const kept = new Map<string, unknown>(Object.entries({ 'autoUpdate.lastRun': Date.UTC(2026, 10, 9, 12), ...store }))
   on('store.get', (_, e) => ({ value: kept.get(e.key) }) as never)
   on('store.set', (_, e) => {
     kept.set(e.key, JSON.parse(JSON.stringify(e.value)))

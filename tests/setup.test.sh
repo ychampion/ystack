@@ -271,6 +271,12 @@ run "$FX"
 check "no host found: non-zero exit with a hint" sh -c '[ "$1" -ne 0 ] && printf "%s" "$2" | grep -q -- "--host"' _ "$RC" "$OUT"
 run "$FX" --host bogus
 check "unknown host is an error" [ "$RC" -ne 0 ]
+new_home installed .claude .codex .config/opencode
+run "$FX" --host installed
+check "--host installed with nothing installed: exit 0, nothing to update, nothing written" sh -c '[ "$1" -eq 0 ] && printf "%s" "$2" | grep -q "nothing to update" && [ ! -e "$3/.claude/skills/alpha" ] && [ ! -e "$3/.codex/skills/alpha" ]' _ "$RC" "$OUT" "$H"
+run "$FX" --host codex
+run "$FX" --host installed
+check "--host installed picks only the hosts holding skills from this checkout" sh -c '[ "$1" -eq 0 ] && printf "%s" "$2" | grep -q "Codex (" && ! printf "%s" "$2" | grep -Eq "(Claude Code|OpenCode) [(]" && [ ! -e "$3/.claude/skills/alpha" ]' _ "$RC" "$OUT" "$H"
 
 section "re-run updates"
 H="$ROOT/home-fresh"

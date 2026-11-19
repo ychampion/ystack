@@ -51,8 +51,9 @@ Installs every skill in skills/ for your agent hosts, for Antigravity every
 plugin in antigravity/plugins/, and for Devin every plugin in devin/plugins/.
 Re-run it to update.
 
-  --host <list>   claude, codex, opencode, antigravity (or agy), devin, all, or auto
-                  (default: auto = every host whose home folder exists).
+  --host <list>   claude, codex, opencode, antigravity (or agy), devin, all, auto or installed
+                  (default: auto = every host whose home folder exists; installed = every
+                  host that already holds skills from this checkout).
                   Comma-separate or repeat for several.
   --agents        Also install claude/agents/*.md into ~/.claude/agents (Claude Code only).
   --mods          Print the commands that add the ystack marketplace and install a
@@ -90,7 +91,7 @@ QUIET=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --host) [ $# -ge 2 ] || die "--host needs a value (claude, codex, opencode, antigravity, devin, all, auto)"; HOSTS_ARG="$HOSTS_ARG,$2"; shift 2 ;;
+    --host) [ $# -ge 2 ] || die "--host needs a value (claude, codex, opencode, antigravity, devin, all, auto, installed)"; HOSTS_ARG="$HOSTS_ARG,$2"; shift 2 ;;
     --host=*) HOSTS_ARG="$HOSTS_ARG,${1#--host=}"; shift ;;
     --agents) DO_AGENTS=1; shift ;;
     --mods) DO_MODS=1; shift ;;
@@ -166,6 +167,25 @@ add_auto() {
     if host_present "$h"; then eval "want_$h=1"; fi
   done
 }
+# add_installed: every host whose skills folder holds a skill from this checkout (a link into it, or a
+# copy whose marker names it). Self-contained: the ownership helpers further down aren't defined yet.
+add_installed() {
+  for h in claude codex opencode antigravity devin; do
+    for e in "$(host_home "$h")/skills"/*; do
+      if [ -L "$e" ]; then
+        t="$(cd -P "$e" 2>/dev/null && pwd -P)" || continue
+        [ "$t" = "$YSTACK_DIR/skills/$(basename "$e")" ] || continue
+      elif [ -f "$e/$MARKER" ]; then
+        [ "$(sed -n 's/^source=//p' "$e/$MARKER" 2>/dev/null | sed -n '1p')" = "$YSTACK_DIR" ] || continue
+      else
+        continue
+      fi
+      eval "want_$h=1"
+      break
+    done
+  done
+}
+asked_installed=0
 list="${HOSTS_ARG#,}"
 [ -n "$list" ] || list="auto"
 old_ifs="$IFS"
@@ -176,8 +196,9 @@ for tok in $list; do
     agy) want_antigravity=1 ;;
     all) want_claude=1; want_codex=1; want_opencode=1; want_antigravity=1; want_devin=1 ;;
     auto) add_auto ;;
+    installed) add_installed; asked_installed=1 ;;
     "") ;;
-    *) IFS="$old_ifs"; die "unknown host '$tok' (expected claude, codex, opencode, antigravity, devin, all or auto)" ;;
+    *) IFS="$old_ifs"; die "unknown host '$tok' (expected claude, codex, opencode, antigravity, devin, all, auto or installed)" ;;
   esac
 done
 IFS="$old_ifs"
@@ -189,6 +210,10 @@ for h in claude codex opencode antigravity devin; do
 done
 HOSTS="${HOSTS# }"
 
+if [ -z "$HOSTS" ] && [ "$DO_MODS" -eq 0 ] && [ "$asked_installed" -eq 1 ]; then
+  say "ystack setup: no agent holds skills from this checkout yet; nothing to update."
+  exit 0
+fi
 if [ -z "$HOSTS" ] && [ "$DO_MODS" -eq 0 ]; then
   die "no agent host found (looked for ~/.claude, ${CODEX_HOME:-~/.codex}, ~/.config/opencode, ~/.gemini/antigravity, $(pretty "$(devin_home)")). Pass --host claude, codex, opencode, antigravity or devin to install anyway."
 fi
