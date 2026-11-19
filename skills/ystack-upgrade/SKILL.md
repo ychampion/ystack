@@ -53,7 +53,12 @@ agent files before.
 
 ```bash
 HOSTS=""
-for pair in "claude:$HOME/.claude/skills" "codex:${CODEX_HOME:-$HOME/.codex}/skills" "opencode:$HOME/.config/opencode/skills"; do
+DEVIN_SKILLS="$HOME/.config/devin/skills"
+case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*)
+  [ -n "${APPDATA:-}" ] && DEVIN_SKILLS="$(cygpath -u "$APPDATA" 2>/dev/null || echo "$APPDATA")/devin/skills" ;;
+esac
+for pair in "claude:$HOME/.claude/skills" "codex:${CODEX_HOME:-$HOME/.codex}/skills" "opencode:$HOME/.config/opencode/skills" \
+            "antigravity:$HOME/.gemini/config/skills" "devin:$DEVIN_SKILLS"; do
   h="${pair%%:*}"; d="${pair#*:}"
   for e in "$d"/*; do
     if { [ -L "$e" ] && case "$(cd -P "$e" 2>/dev/null && pwd -P)" in */skills/*) true ;; *) false ;; esac; } || [ -f "$e/.ystack" ]; then

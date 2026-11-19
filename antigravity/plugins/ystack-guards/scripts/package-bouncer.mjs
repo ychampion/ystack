@@ -9,7 +9,7 @@
 //   allow: everything else, and when a registry can't be reached (fail open, like the original).
 // Packages from URLs, git, local paths or other registries are not checked. Requirement files are not read.
 
-import { ALLOW, argsOf, commandCwd, commandsIn, isMain, log, runHook } from './lib.mjs'
+import { ALLOW, commandsIn, shellCall, isMain, log, runHook } from './lib.mjs'
 import { NPM, PYPI } from './popular.mjs'
 
 const GUARD = 'package-bouncer'
@@ -821,12 +821,11 @@ export function judge(spec, found, now = Date.now(), cfg = CONFIG) {
 
 /** The hook: PreToolUse input -> decision. `fetchFn` and `now` are for tests. */
 export async function decide(input, { fetchFn = globalThis.fetch, now = Date.now() } = {}) {
-  const tc = input?.toolCall
-  if (!tc || tc.name !== 'run_command') return ALLOW
-  const args = argsOf(tc)
-  const command = typeof args.CommandLine === 'string' ? args.CommandLine : ''
+  const call = shellCall(input)
+  if (!call) return ALLOW
+  const { command, cwd } = call
   if (!/\b(npm|npx|bunx?|pnpm|pnpx|yarn|pip\d*(\.\d+)?|pipx|python\d*(\.\d+)?|py|uvx?)\b/i.test(command)) return ALLOW
-  const specs = parseInstalls(command, commandCwd(input, args)).slice(0, 20)
+  const specs = parseInstalls(command, cwd).slice(0, 20)
   if (specs.length === 0) return ALLOW
   const verdicts = await Promise.all(specs.map(async s => judge(s, s.source === 'registry' ? await lookup(s, fetchFn) : undefined, now)))
   for (const v of verdicts) for (const n of v.notes) log(GUARD, n)

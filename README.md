@@ -1,6 +1,6 @@
 # ystack
 
-ystack is a collection of mods, skills, and setup tools for Claude Code, Codex, OpenCode and Antigravity. It is for developers who run coding agents for long sessions and want checks on their work and usage.
+ystack is a collection of mods, skills, and setup tools for Claude Code, Codex, OpenCode, Antigravity and Devin. It is for developers who run coding agents for long sessions and want checks on their work and usage.
 
 On one heavy user's logs, it cut usage about 78% per hour of work and 39% per API call. [How that was measured](#what-the-logs-show).
 
@@ -72,19 +72,19 @@ ystack works when Claude Code runs headless: `claude -p`, the Agent SDK, and app
 
 Headless, the guards and rewrites work as usual (`push-guard`, `verify`, `package-bouncer`, `iron-rules`, `model-router` and the rest). What needs a person is skipped: panes and the prompt box don't exist, toasts and status lines arrive as `ui_toast` and `ui_status` events the harness can show or ignore, and no mod starts a turn of its own. `context-meter` doesn't hand off or compact by itself there, since an unasked turn would show up in the harness's chat; Claude Code's own auto-compaction still runs. Commands you type, such as `/review-panel` or `/queue`, work as they do in a terminal.
 
-## Skills for Claude Code, Codex, OpenCode and Antigravity
+## Skills for Claude Code, Codex, OpenCode, Antigravity and Devin
 
 ```bash
 git clone https://github.com/ychampion/ystack.git ~/ystack && ~/ystack/setup
 ```
 
-Setup installs every skill in `skills/` for each agent you have (Claude Code, Codex, OpenCode, Antigravity). For Antigravity it also installs the `ystack-guards` plugin into `~/.gemini/config/plugins`; quit the Antigravity app before updating or removing it, because the app keeps the folder open. Run it again to update them. Machine-specific values, including your git identity, thresholds, and paths, are settings you fill in at install.
+Setup installs every skill in `skills/` for each agent you have (Claude Code, Codex, OpenCode, Antigravity, Devin). For Antigravity it also installs the `ystack-guards` plugin into `~/.gemini/config/plugins`; quit the Antigravity app before updating or removing it, because the app keeps the folder open. For Devin (Devin Desktop and the `devin` CLI) it installs the same guards as a Devin plugin and registers it with `devin plugins install --local`, which needs the CLI logged in once (`devin auth login`); Desktop picks it up in its next session. Run it again to update them. Machine-specific values, including your git identity, thresholds, and paths, are settings you fill in at install.
 
 On macOS and Linux, skills are symlinks into the checkout, so `git pull` updates them. On Windows (Git Bash), they are copies: re-run `./setup` after each pull, or use `/ystack-upgrade`.
 
 | Flag | Does |
 | --- | --- |
-| `--host claude,codex,opencode,antigravity` | Pick hosts (default: every host found on this machine; `all` for all four; `agy` is short for `antigravity`) |
+| `--host claude,codex,opencode,antigravity,devin` | Pick hosts (default: every host found on this machine; `all` for all five; `agy` is short for `antigravity`) |
 | `--agents` | Also install the `opus-medium`, `opus-high`, and `haiku-max` subagent types into `~/.claude/agents` |
 | `--mods` | Print the commands that add the marketplace and a starter set of mods; add `--yes` to run them |
 | `--dry-run` | Show what would change without changing anything |
@@ -106,14 +106,15 @@ Later, `/ystack-upgrade` pulls, re-runs setup for the same hosts, and updates in
 | Folder | For | Status |
 | --- | --- | --- |
 | [`claude/`](claude/) | Claude Code | 37 mods, three subagent types, a starter `CLAUDE.md`, and measured write-ups in [`claude/docs/`](claude/docs/) |
-| [`skills/`](skills/) | Claude Code, Codex, OpenCode, Antigravity (Gemini models, in the app and the `agy` CLI), and other agents that read skills | 51 skills: engineering workflow (`blast-radius`, `interrogate`, `arena`, `recall`, `debug-loop`, `flaky-test`, `perf-loop`, `secure-diff`, `migration-plan` and more), planning and agent-writing (`grill`, `agent-writing`, `eval-judge`), ideas from live evidence (`idea-scout`), 18 picked from other open collections (`tdd`, `wayfinder`, `prototype`, `migrate-to-rust`…), design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
+| [`skills/`](skills/) | Claude Code, Codex, OpenCode, Antigravity (Gemini models, in the app and the `agy` CLI), Devin (Devin Desktop and the `devin` CLI), and other agents that read skills | 51 skills: engineering workflow (`blast-radius`, `interrogate`, `arena`, `recall`, `debug-loop`, `flaky-test`, `perf-loop`, `secure-diff`, `migration-plan` and more), planning and agent-writing (`grill`, `agent-writing`, `eval-judge`), ideas from live evidence (`idea-scout`), 18 picked from other open collections (`tdd`, `wayfinder`, `prototype`, `migrate-to-rust`…), design (`taste`), screenshots, film and sound, agent-ops fixes, founder work (discovery, sales, weekly review, YC) |
 | [`antigravity/`](antigravity/plugins/ystack-guards/) | Antigravity (the app and the `agy` CLI) | `ystack-guards`, a plugin with three guards as Antigravity hooks: `push-guard` (no keys in a push, no repo made public, no force-push to `main`), `package-bouncer` (no made-up or brand-new packages) and `verify` (no "done" without a check). `./setup` installs it with the skills |
+| [`devin/`](devin/plugins/ystack-guards/) | Devin (Devin Desktop and the `devin` CLI) | `ystack-guards` as a Devin plugin: the same three guards, as Devin hooks. `./setup --host devin` installs it with the skills and registers it with Devin |
 | [`codex/`](codex/) | Codex CLI | A brief template for unattended `codex exec` runs; pairs with the `codex-ladder` mod |
 | [`ops/`](ops/) | Any Linux server | `security-sweep`: a weekly scan of OS packages, repos, and containers that installs only restart-free security patches and reports the rest |
 
 Most agent stacks provide skills: written advice the model may or may not follow. ystack also has mods, which use hooks on tool calls, prompts, and subagent turns. Rules such as requiring a real check before reporting work done and checking for keys in pushed commits run as code every time, whether the model remembers them or not.
 
-Guards cover keys pushed to a remote, private repos made public, force-pushes over `main`, and hallucinated packages installed. Decisions that need your input go to an inbox while the agent continues with its recommended default. The same skills work across Claude Code, Codex, OpenCode and Antigravity; Codex also gets a brief template and an effort ladder.
+Guards cover keys pushed to a remote, private repos made public, force-pushes over `main`, and hallucinated packages installed. Decisions that need your input go to an inbox while the agent continues with its recommended default. The same skills work across Claude Code, Codex, OpenCode, Antigravity and Devin; Codex also gets a brief template and an effort ladder.
 
 ## What the logs show
 

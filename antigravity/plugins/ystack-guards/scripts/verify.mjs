@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// verify for Antigravity (Stop). Port of the gate in ystack's Claude Code verify mod: when the agent is about
+// verify for Antigravity (Stop) and Devin (PostToolUse + Stop, see the Devin section). Port of the gate in ystack's Claude Code verify mod: when the agent is about
 // to finish (it answered with no tool call) after editing code files, and ran no test, build or check
 // command after its last edit, it is sent back once to run a real check. Once per conversation at most:
 // a marker file keyed by the conversation id is written before asking, so it can never loop.
@@ -10,7 +10,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { isMain, runHook } from './lib.mjs'
+import { HOST, isMain, runHook } from './lib.mjs'
 
 const GUARD = 'verify'
 const STOP = Object.freeze({})
@@ -144,4 +144,106 @@ export function decide(input, { dir = stateDir() } = {}) {
   }
 }
 
-if (isMain(import.meta.url)) await runHook(GUARD, input => decide(input), { pass: STOP })
+// ---- Devin ----
+// Devin's Stop input carries no transcript, so the Devin hooks keep their own record: PostToolUse notes each
+// code file edited and clears the list when a check command runs; Stop reads it.
+
+const DEVIN_EDIT_TOOLS = new Set(['write', 'edit', 'apply_patch', 'notebook_edit'])
+const DEVIN_SHELL_TOOLS = new Set(['exec', 'shell_command'])
+const PATCH_FILE = /^\*\*\* (?:Add|Update) File: (.+)$/gm
+
+/** The files a Devin edit-tool call wrote, from whichever field names it uses. */
+export function devinEditedFiles(toolInput) {
+  const ti = toolInput && typeof toolInput === 'object' ? toolInput : {}
+  const out = []
+  for (const k of ['file_path', 'path', 'target_file', 'filePath', 'notebook_path']) if (typeof ti[k] === 'string' && ti[k]) out.push(ti[k])
+  for (const k of ['patch', 'input', 'diff']) {
+    if (typeof ti[k] !== 'string') continue
+    for (const m of ti[k].matchAll(PATCH_FILE)) out.push(m[1].trim())
+  }
+  return [...new Set(out)]
+}
+
+const stateFor = (dir, id) => path.join(dir, `verify-devin-${String(id).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 120)}.json`)
+
+function readState(file) {
+  try {
+    const s = JSON.parse(fs.readFileSync(file, 'utf8'))
+    return { files: Array.isArray(s.files) ? s.files : [], asked: s.asked === true }
+  } catch (err) {
+    if (err?.code !== 'ENOENT') log(GUARD, `could not read ${file}, starting it afresh: ${err?.message ?? err}`)
+    return { files: [], asked: false }
+  }
+}
+
+// Written to a temporary file and renamed, so a hook running at the same moment never reads half a file.
+function writeState(file, state) {
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(state))
+  fs.renameSync(tmp, file)
+}
+
+/** PostToolUse: keep the list of code files edited since the last check. Always answers `{}`. */
+export function recordDevin(input, { dir = stateDir() } = {}) {
+  const id = input?.session_id
+  const tool = input?.tool_name
+  if (typeof tool !== 'string') return STOP
+  if (!id) {
+    log(GUARD, `${tool} call has no session_id; not recording it`)
+    return STOP
+  }
+  const file = stateFor(dir, id)
+  if (DEVIN_SHELL_TOOLS.has(tool)) {
+    // A check counts even when it fails (a failing test still tells the agent something); no success test here.
+    let cmd = input.tool_input?.command
+    if (Array.isArray(cmd)) cmd = cmd.map(String).join(' ')
+    if (typeof cmd !== 'string' || !CHECK_CMD.test(cmd)) return STOP
+    const s = readState(file)
+    if (s.files.length > 0) writeState(file, { ...s, files: [] })
+    return STOP
+  }
+  if (!DEVIN_EDIT_TOOLS.has(tool)) return STOP
+  if (input.tool_response && input.tool_response.success === false) return STOP
+  const edited = devinEditedFiles(input.tool_input)
+  if (edited.length === 0) log(GUARD, `${tool} call names no file I can read (tool_input keys: ${Object.keys(input.tool_input ?? {}).join(', ') || 'none'})`)
+  const code = edited.filter(f => !DOC_FILE.test(f))
+  if (code.length === 0) return STOP
+  const s = readState(file)
+  writeState(file, { ...s, files: [...new Set([...s.files, ...code])] })
+  return STOP
+}
+
+/** Stop: send the agent back once (`decision: 'continue'`, which Devin gets as a block) if edits are unchecked. */
+export function decideDevin(input, { dir = stateDir() } = {}) {
+  const id = input?.session_id
+  if (!id || input.stop_hook_active === true) return STOP
+  const file = stateFor(dir, id)
+  const s = readState(file)
+  if (s.asked || s.files.length === 0) return STOP
+  // Mark first: if anything after this fails, the agent is never asked twice.
+  writeState(file, { ...s, asked: true })
+  const roots = [input.cwd, process.env.DEVIN_PROJECT_DIR].filter(r => typeof r === 'string' && r)
+  const files = s.files.map(f => (path.isAbsolute(f) || roots.length === 0 ? f : path.resolve(roots[0], f)))
+  const shown = files.slice(0, 5).map(f => path.basename(f)).join(', ') + (files.length > 5 ? `, and ${files.length - 5} more` : '')
+  return {
+    decision: 'continue',
+    reason:
+      `verify: you edited ${files.length} file(s) (${shown}) but ran no test, build or check after the last edit. ` +
+      `Before finishing, run \`${suggestCheck(files, roots)}\` (or the closest real check: run the thing you changed) and report what it showed. ` +
+      "If no check can be run here, say so plainly in your answer instead of implying it works. You'll only be asked this once.",
+  }
+}
+
+if (isMain(import.meta.url)) {
+  await runHook(
+    GUARD,
+    input => {
+      if (HOST !== 'devin') return decide(input)
+      if (input?.hook_event_name === 'PostToolUse') return recordDevin(input)
+      if (input?.hook_event_name === 'Stop') return decideDevin(input)
+      return STOP
+    },
+    { pass: STOP },
+  )
+}

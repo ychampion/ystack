@@ -16,6 +16,10 @@ ROOT="$(cd "$ROOT" && pwd -P)" || exit 1
 if [ -z "$ROOT" ] || [ ! -d "$ROOT" ]; then echo "setup tests: could not resolve the temp directory" >&2; exit 1; fi
 trap 'rm -rf "$ROOT"' EXIT # only now that ROOT is known to be a fresh temp directory
 unset CODEX_HOME
+# Devin's folder is under %APPDATA% on Windows, outside HOME: point it into the temp dir, and never let a
+# test reach the real devin CLI. The Devin section sets both per run.
+export APPDATA="$ROOT/no-appdata"
+export YSTACK_DEVIN="$ROOT/no-devin-cli"
 
 PASS=0
 FAIL=0
@@ -65,6 +69,13 @@ make_fixture() { # DIR
 ' >"$1/antigravity/plugins/guard/hooks.json"
   printf 'console.log("{}")
 ' >"$1/antigravity/plugins/guard/scripts/g.mjs"
+  mkdir -p "$1/devin/plugins/dguard/.devin-plugin" "$1/devin/plugins/dguard/scripts" "$1/devin/plugins/not-a-plugin"
+  printf '{ "name": "dguard", "version": "1.0.0" }
+' >"$1/devin/plugins/dguard/.devin-plugin/plugin.json"
+  printf '{ "hooks": {} }
+' >"$1/devin/plugins/dguard/hooks.json"
+  printf 'console.log("{}")
+' >"$1/devin/plugins/dguard/scripts/g.mjs"
 }
 
 new_home() { # NAME [dirs...] -> sets H
@@ -191,9 +202,70 @@ run "$FX" --host agy --uninstall
 check "--uninstall removes the plugin" [ ! -e "$H/.gemini/config/plugins/guard" ]
 check "--uninstall keeps other plugins" sh -c '[ -f "$1/vendor-plugin/plugin.json" ] && [ -f "$1/guard-two/plugin.json" ]' _ "$H/.gemini/config/plugins"
 check "--uninstall summary names the plugin folder" has "Antigravity plugins (~/.gemini/config/plugins): 1 removed"
+section "Devin: skills in Devin's folder, plugins in <Devin folder>/ystack-plugins, registered with the CLI"
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) DEVIN_REL="AppData/Roaming/devin" ;; *) DEVIN_REL=".config/devin" ;; esac
+# A fake devin CLI: logs each call, keeps the registered plugin names in a state file, and with
+# FAKE_DEVIN_AUTH=out refuses like the real one does when not logged in.
+FD="$ROOT/fake-devin"
+cat >"$FD" <<'EOF'
+#!/usr/bin/env bash
+echo "$*" >>"$FAKE_DEVIN_LOG"
+st="$FAKE_DEVIN_STATE"; touch "$st"
+if [ "${FAKE_DEVIN_AUTH:-in}" = out ]; then echo "Error: You must be logged in to manage plugins. Run \`devin auth login\` first." >&2; exit 1; fi
+case "$1 $2" in
+  "plugins list") cat "$st" ;;
+  "plugins install") p="$4"; n="$(basename "$p")"; [ -f "$p/.devin-plugin/plugin.json" ] || { echo "no plugin at $p" >&2; exit 1; }; echo "$n  1.0.0" >>"$st" ;;
+  "plugins remove") grep -v "^$3 " "$st" >"$st.tmp"; mv "$st.tmp" "$st" ;;
+  "plugins update") ;;
+  *) echo "unexpected: $*" >&2; exit 2 ;;
+esac
+EOF
+chmod +x "$FD"
+drun() { # FIXTURE ARGS... with the fake devin CLI and APPDATA under H
+  fx="$1"; shift
+  OUT="$(HOME="$H" APPDATA="$H/AppData/Roaming" YSTACK_DEVIN="$FD" FAKE_DEVIN_LOG="$H/devin.log" FAKE_DEVIN_STATE="$H/devin.state" bash "$fx/setup" "$@" 2>&1)"
+  RC=$?
+}
+new_home devin "$DEVIN_REL"
+drun "$FX"
+check "auto finds Devin (exit $RC)" sh -c '[ "$1" -eq 0 ]' _ "$RC"
+check "skills go to Devin's skills folder" is_ours "$H/$DEVIN_REL/skills/alpha"
+check "summary names Devin" has "Devin (~/$DEVIN_REL/skills): 2 installed"
+check "the plugin is copied with its manifest, hooks and scripts" sh -c '[ -f "$1/.devin-plugin/plugin.json" ] && [ -f "$1/hooks.json" ] && [ -f "$1/scripts/g.mjs" ]' _ "$H/$DEVIN_REL/ystack-plugins/dguard"
+check "a folder without .devin-plugin/plugin.json is ignored" [ ! -e "$H/$DEVIN_REL/ystack-plugins/not-a-plugin" ]
+check "the plugin is registered with devin plugins install --local -y" sh -c 'grep -q "^plugins install --local .*dguard -y$" "$1" && grep -q "^dguard " "$2"' _ "$H/devin.log" "$H/devin.state"
+check "summary says registered" has "Devin plugin dguard: registered (start a new Devin session"
+drun "$FX" --host devin
+check "re-run: no second install" sh -c '[ "$(grep -c "^plugins install" "$1")" -eq 1 ]' _ "$H/devin.log"
+check "re-run: says registered" has "Devin plugin dguard: registered$"
+if [ "$MODE" = copy ]; then
+  printf '{ "name": "dguard", "version": "1.0.1" }
+' >"$FX/devin/plugins/dguard/.devin-plugin/plugin.json"
+  drun "$FX" --host devin
+  check "a changed plugin is copied and Devin is told to refresh it" sh -c 'grep -q "1.0.1" "$1/.devin-plugin/plugin.json" && grep -q "^plugins update dguard$" "$2"' _ "$H/$DEVIN_REL/ystack-plugins/dguard" "$H/devin.log"
+  printf '{ "name": "dguard", "version": "1.0.0" }
+' >"$FX/devin/plugins/dguard/.devin-plugin/plugin.json"
+fi
+drun "$FX" --host devin --uninstall
+check "--uninstall deregisters, then removes the plugin and the skills" sh -c 'grep -q "^plugins remove dguard --local -y$" "$1" && ! grep -q "^dguard " "$2" && [ ! -e "$3/ystack-plugins" ] && [ ! -e "$3/skills/alpha" ]' _ "$H/devin.log" "$H/devin.state" "$H/$DEVIN_REL"
+check "--uninstall exit 0" [ "$RC" -eq 0 ]
+new_home devinnone "$DEVIN_REL"
+OUT="$(HOME="$H" APPDATA="$H/AppData/Roaming" YSTACK_DEVIN="$FD" FAKE_DEVIN_AUTH=out FAKE_DEVIN_LOG="$H/devin.log" FAKE_DEVIN_STATE="$H/devin.state" bash "$FX/setup" --host devin --uninstall 2>&1)"; RC=$?
+check "--uninstall with nothing installed for Devin: exit 0, no devin command run" sh -c '[ "$1" -eq 0 ] && [ ! -e "$2" ]' _ "$RC" "$H/devin.log"
+new_home devinout "$DEVIN_REL"
+OUT="$(HOME="$H" APPDATA="$H/AppData/Roaming" YSTACK_DEVIN="$FD" FAKE_DEVIN_AUTH=out FAKE_DEVIN_LOG="$H/devin.log" FAKE_DEVIN_STATE="$H/devin.state" bash "$FX/setup" --host devin 2>&1)"; RC=$?
+check "not logged in: still exit 0, plugin copied" sh -c '[ "$1" -eq 0 ] && [ -f "$2/ystack-plugins/dguard/hooks.json" ]' _ "$RC" "$H/$DEVIN_REL"
+check "not logged in: prints the login and install commands" sh -c 'printf "%s" "$1" | grep -q "devin auth login, then: devin plugins install --local"' _ "$OUT"
+new_home devinnocli "$DEVIN_REL"
+OUT="$(HOME="$H" APPDATA="$H/AppData/Roaming" YSTACK_DEVIN="" PATH="/usr/bin:/bin" LOCALAPPDATA="$H/none" bash "$FX/setup" --host devin 2>&1)"; RC=$?
+check "no devin CLI: exit 0 and says how to register" sh -c '[ "$1" -eq 0 ] && printf "%s" "$2" | grep -q "devin CLI was not found"' _ "$RC" "$OUT"
+drun "$FX" --host devin --dry-run
+check "--dry-run calls no devin command" sh -c '[ ! -e "$1" ]' _ "$H/devin.log"
+
 new_home claudeonly .claude
 run "$FX" --host claude
 check "other hosts get no Antigravity plugins" [ ! -e "$H/.gemini" ]
+check "other hosts get no Devin plugins" [ ! -e "$H/$DEVIN_REL" ]
 new_home nohost
 run "$FX"
 check "no host found: non-zero exit with a hint" sh -c '[ "$1" -ne 0 ] && printf "%s" "$2" | grep -q -- "--host"' _ "$RC" "$OUT"

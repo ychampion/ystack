@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { delimiter, isAbsolute, join } from 'node:path'
 
-import { ALLOW, argsOf, commandCwd, commandsIn, isDynamic, isMain, log, runHook } from './lib.mjs'
+import { ALLOW, commandsIn, shellCall, isDynamic, isMain, log, runHook } from './lib.mjs'
 
 const GUARD = 'push-guard'
 export const PROTECTED_BRANCHES = ['main', 'master']
@@ -477,13 +477,12 @@ export function check(command, cwd, notes = []) {
 
 /** The hook: PreToolUse input -> decision. */
 export function decide(input) {
-  const tc = input?.toolCall
-  if (!tc || tc.name !== 'run_command') return ALLOW
-  const args = argsOf(tc)
-  const command = typeof args.CommandLine === 'string' ? args.CommandLine : ''
+  const call = shellCall(input)
+  if (!call) return ALLOW
+  const { command, cwd } = call
   if (!/\b(git|gh|curl|invoke-restmethod|invoke-webrequest|irm|iwr)\b/i.test(command)) return ALLOW
   const notes = []
-  const why = check(command, commandCwd(input, args), notes)
+  const why = check(command, cwd, notes)
   for (const n of notes) log(GUARD, n)
   if (why.length > 0) return { decision: 'deny', reason: `push-guard stopped this command.\n\n${why.join('\n\n')}` }
   return ALLOW

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ystack setup: install ystack's skills for your agent hosts (Claude Code, Codex, OpenCode,
-# Antigravity), its Antigravity plugins (antigravity/plugins/), and on request its Claude Code
-# subagent types and a starter set of mods.
+# Antigravity, Devin), its Antigravity plugins (antigravity/plugins/) and Devin plugins
+# (devin/plugins/), and on request its Claude Code subagent types and a starter set of mods.
 #
 # Works in bash 3.2 (macOS), bash on Linux, and Git Bash on Windows. Keep it that way:
 # no arrays, no associative arrays, no ${x,,}, no mapfile, no readlink -f.
@@ -47,10 +47,11 @@ usage() {
   cat <<'EOF'
 Usage: ./setup [options]
 
-Installs every skill in skills/ for your agent hosts, and for Antigravity every
-plugin in antigravity/plugins/. Re-run it to update.
+Installs every skill in skills/ for your agent hosts, for Antigravity every
+plugin in antigravity/plugins/, and for Devin every plugin in devin/plugins/.
+Re-run it to update.
 
-  --host <list>   claude, codex, opencode, antigravity (or agy), all, or auto
+  --host <list>   claude, codex, opencode, antigravity (or agy), devin, all, or auto
                   (default: auto = every host whose home folder exists).
                   Comma-separate or repeat for several.
   --agents        Also install claude/agents/*.md into ~/.claude/agents (Claude Code only).
@@ -68,7 +69,10 @@ Skill folders:  Claude Code  ~/.claude/skills
                 Codex        ${CODEX_HOME:-~/.codex}/skills
                 OpenCode     ~/.config/opencode/skills
                 Antigravity  ~/.gemini/config/skills
-Plugin folder:  Antigravity  ~/.gemini/config/plugins
+                Devin        ~/.config/devin/skills (Windows: %APPDATA%\devin\skills)
+Plugin folders: Antigravity  ~/.gemini/config/plugins
+                Devin        <Devin folder>/ystack-plugins, then registered with
+                             `devin plugins install --local` (needs `devin auth login`)
 macOS and Linux get symlinks into this checkout; Windows gets copies (re-run after git pull).
 EOF
 }
@@ -86,7 +90,7 @@ QUIET=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --host) [ $# -ge 2 ] || die "--host needs a value (claude, codex, opencode, antigravity, all, auto)"; HOSTS_ARG="$HOSTS_ARG,$2"; shift 2 ;;
+    --host) [ $# -ge 2 ] || die "--host needs a value (claude, codex, opencode, antigravity, devin, all, auto)"; HOSTS_ARG="$HOSTS_ARG,$2"; shift 2 ;;
     --host=*) HOSTS_ARG="$HOSTS_ARG,${1#--host=}"; shift ;;
     --agents) DO_AGENTS=1; shift ;;
     --mods) DO_MODS=1; shift ;;
@@ -118,7 +122,21 @@ host_home() {
     codex) echo "${CODEX_HOME:-$HOME/.codex}" ;;
     opencode) echo "$HOME/.config/opencode" ;;
     antigravity) echo "$HOME/.gemini/config" ;; # its global customization root; skills/ under it
+    devin) devin_home ;;
   esac
+}
+# Devin (the Devin CLI and Devin Desktop) keeps its user config in %APPDATA%\devin on Windows and
+# ~/.config/devin elsewhere; its user skills are in skills/ under it.
+devin_home() {
+  case "$(uname -s 2>/dev/null || echo unknown)" in
+    MINGW*|MSYS*|CYGWIN*)
+      if [ -n "${APPDATA:-}" ]; then
+        dh_app="$APPDATA"
+        if command -v cygpath >/dev/null 2>&1; then dh_app="$(cygpath -u "$APPDATA")"; fi
+        echo "$dh_app/devin"; return
+      fi ;;
+  esac
+  echo "$HOME/.config/devin"
 }
 # The folder whose presence means the host is installed (auto mode). Antigravity (the app and its agy
 # CLI) keeps its state in ~/.gemini/antigravity; its skills root ~/.gemini/config may not exist yet.
@@ -134,6 +152,7 @@ host_label() {
     codex) echo "Codex" ;;
     opencode) echo "OpenCode" ;;
     antigravity) echo "Antigravity" ;;
+    devin) echo "Devin" ;;
   esac
 }
 
@@ -141,8 +160,9 @@ want_claude=0
 want_codex=0
 want_opencode=0
 want_antigravity=0
+want_devin=0
 add_auto() {
-  for h in claude codex opencode antigravity; do
+  for h in claude codex opencode antigravity devin; do
     if host_present "$h"; then eval "want_$h=1"; fi
   done
 }
@@ -152,25 +172,25 @@ old_ifs="$IFS"
 IFS=','
 for tok in $list; do
   case "$tok" in
-    claude|codex|opencode|antigravity) eval "want_$tok=1" ;;
+    claude|codex|opencode|antigravity|devin) eval "want_$tok=1" ;;
     agy) want_antigravity=1 ;;
-    all) want_claude=1; want_codex=1; want_opencode=1; want_antigravity=1 ;;
+    all) want_claude=1; want_codex=1; want_opencode=1; want_antigravity=1; want_devin=1 ;;
     auto) add_auto ;;
     "") ;;
-    *) IFS="$old_ifs"; die "unknown host '$tok' (expected claude, codex, opencode, antigravity, all or auto)" ;;
+    *) IFS="$old_ifs"; die "unknown host '$tok' (expected claude, codex, opencode, antigravity, devin, all or auto)" ;;
   esac
 done
 IFS="$old_ifs"
 
 HOSTS=""
-for h in claude codex opencode antigravity; do
+for h in claude codex opencode antigravity devin; do
   eval "w=\$want_$h"
   if [ "$w" -eq 1 ]; then HOSTS="$HOSTS $h"; fi
 done
 HOSTS="${HOSTS# }"
 
 if [ -z "$HOSTS" ] && [ "$DO_MODS" -eq 0 ]; then
-  die "no agent host found (looked for ~/.claude, ${CODEX_HOME:-~/.codex}, ~/.config/opencode, ~/.gemini/antigravity). Pass --host claude, codex, opencode or antigravity to install anyway."
+  die "no agent host found (looked for ~/.claude, ${CODEX_HOME:-~/.codex}, ~/.config/opencode, ~/.gemini/antigravity, $(pretty "$(devin_home)")). Pass --host claude, codex, opencode, antigravity or devin to install anyway."
 fi
 
 # ---- link or copy ----
@@ -613,6 +633,96 @@ for f in "$YSTACK_DIR"/antigravity/plugins/*/plugin.json; do
 done
 PLUGIN_NAMES="${PLUGIN_NAMES# }"
 
+# Devin plugins (devin/plugins/<name>/.devin-plugin/plugin.json) are copied or linked into
+# <Devin folder>/ystack-plugins under the same rules, then registered with the Devin CLI
+# (`devin plugins install --local`), which Devin Desktop shares.
+DEVIN_PLUGIN_NAMES=""
+for f in "$YSTACK_DIR"/devin/plugins/*/.devin-plugin/plugin.json; do
+  [ -f "$f" ] || continue
+  DEVIN_PLUGIN_NAMES="$DEVIN_PLUGIN_NAMES $(basename "$(dirname "$(dirname "$f")")")"
+done
+DEVIN_PLUGIN_NAMES="${DEVIN_PLUGIN_NAMES# }"
+
+# The devin CLI: YSTACK_DEVIN, else `devin` on PATH, else the copy Devin Desktop ships inside the app.
+devin_bin() {
+  if [ -n "${YSTACK_DEVIN:-}" ]; then echo "$YSTACK_DEVIN"; return; fi
+  if command -v devin >/dev/null 2>&1; then command -v devin; return; fi
+  for db in \
+    "${LOCALAPPDATA:-/nonexistent}/Programs/Devin/resources/app/extensions/windsurf/devin/bin/devin.exe" \
+    "/Applications/Devin.app/Contents/Resources/app/extensions/windsurf/devin/bin/devin"; do
+    if command -v cygpath >/dev/null 2>&1 && [ "${db#/Applications}" = "$db" ]; then db="$(cygpath -u "$db" 2>/dev/null || echo "$db")"; fi
+    if [ -f "$db" ]; then echo "$db"; return; fi
+  done
+}
+native_path() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else echo "$1"; fi; }
+
+# devin_register DIR CHANGED: register (or with --uninstall, deregister) each ystack Devin plugin in DIR.
+# CHANGED=1 when this run updated a plugin's files, so Devin re-reads them.
+devin_register() {
+  dr_dir="$1"; dr_changed="$2"
+  for dr_name in $DEVIN_PLUGIN_NAMES; do
+    dr_path="$dr_dir/$dr_name"
+    # Nothing of ours in DIR (never installed for Devin, or already removed): nothing to register or deregister.
+    [ -e "$dr_path" ] || continue
+    dr_cmd_add="devin plugins install --local \"$(native_path "$dr_path")\" -y"
+    if [ "$DRY" -eq 1 ]; then
+      if [ "$UNINSTALL" -eq 1 ]; then say "  $dr_name: would deregister from Devin"; else say "  $dr_name: would register with Devin ($dr_cmd_add)"; fi
+      continue
+    fi
+    dr_bin="$(devin_bin)"
+    if [ -z "$dr_bin" ]; then
+      if [ "$UNINSTALL" -eq 0 ]; then
+        add_summary "  Devin plugin $dr_name: copied but not registered, the devin CLI was not found. Install Devin, then run: $dr_cmd_add"
+      else
+        add_summary "  Devin plugin $dr_name: could not deregister, the devin CLI was not found. If Devin still lists it, run: devin plugins remove $dr_name --local -y"
+      fi
+      continue
+    fi
+    if ! dr_list="$("$dr_bin" plugins list </dev/null 2>&1)"; then
+      if printf '%s' "$dr_list" | grep -Eqi 'logged in|auth login'; then
+        if [ "$UNINSTALL" -eq 0 ]; then
+          add_summary "  Devin plugin $dr_name: copied but not registered, the devin CLI is not logged in. Run: devin auth login, then: $dr_cmd_add"
+        else
+          add_summary "  Devin plugin $dr_name: could not deregister, the devin CLI is not logged in. Run: devin auth login, then: devin plugins remove $dr_name --local -y"
+        fi
+      else
+        FAILED=$((FAILED + 1))
+        add_summary "  Devin plugin $dr_name: FAILED, could not list Devin's plugins: $(printf '%s\n' "$dr_list" | sed -n '1p')"
+      fi
+      continue
+    fi
+    dr_listed=0
+    if printf '%s\n' "$dr_list" | grep -Eq "(^|[^A-Za-z0-9_.-])$dr_name([^A-Za-z0-9_.-]|\$)"; then dr_listed=1; fi
+    if [ "$UNINSTALL" -eq 1 ]; then
+      [ "$dr_listed" -eq 1 ] || continue
+      if dr_out="$("$dr_bin" plugins remove "$dr_name" --local -y </dev/null 2>&1)"; then
+        add_summary "  Devin plugin $dr_name: deregistered"
+      else
+        FAILED=$((FAILED + 1))
+        add_summary "  Devin plugin $dr_name: FAILED to deregister: $(printf '%s\n' "$dr_out" | sed -n '1p'). Run: devin plugins remove $dr_name --local -y"
+      fi
+    elif [ "$dr_listed" -eq 1 ]; then
+      if [ "$dr_changed" -eq 1 ]; then
+        if dr_out="$("$dr_bin" plugins update "$dr_name" </dev/null 2>&1)"; then
+          add_summary "  Devin plugin $dr_name: registered, refreshed (start a new Devin session to load it)"
+        else
+          FAILED=$((FAILED + 1))
+          add_summary "  Devin plugin $dr_name: FAILED to refresh: $(printf '%s\n' "$dr_out" | sed -n '1p')"
+        fi
+      else
+        add_summary "  Devin plugin $dr_name: registered"
+      fi
+    else
+      if dr_out="$("$dr_bin" plugins install --local "$(native_path "$dr_path")" -y </dev/null 2>&1)"; then
+        add_summary "  Devin plugin $dr_name: registered (start a new Devin session to load it)"
+      else
+        FAILED=$((FAILED + 1))
+        add_summary "  Devin plugin $dr_name: FAILED to register: $(printf '%s\n' "$dr_out" | sed -n '1p'). Run: $dr_cmd_add"
+      fi
+    fi
+  done
+}
+
 STAGE_DIR="" # where new copies are built before they move into place; empty: next to them
 for h in $HOSTS; do
   SRC_SUB="skills"; SRC_FILE="SKILL.md"
@@ -624,6 +734,19 @@ for h in $HOSTS; do
     sync_folder antigravity-plugins "$(host_home "$h")/plugins" "Antigravity plugins" plugins "$PLUGIN_NAMES"
     SRC_SUB="skills"; SRC_FILE="SKILL.md"; STAGE_DIR=""
     rmdir "$(host_home "$h")/.ystack-stage" 2>/dev/null || true
+  fi
+  if [ "$h" = devin ]; then
+    # Deregister before the folder goes, register after it is in place.
+    [ "$UNINSTALL" -eq 0 ] || devin_register "$(host_home "$h")/ystack-plugins" 0
+    SRC_SUB="devin/plugins"; SRC_FILE=".devin-plugin/plugin.json"
+    sync_folder devin-plugins "$(host_home "$h")/ystack-plugins" "Devin plugins" plugins "$DEVIN_PLUGIN_NAMES"
+    SRC_SUB="skills"; SRC_FILE="SKILL.md"
+    if [ "$UNINSTALL" -eq 0 ]; then
+      dv_changed=0; [ "$n_upd" -eq 0 ] || dv_changed=1
+      devin_register "$(host_home "$h")/ystack-plugins" "$dv_changed"
+    else
+      rmdir "$(host_home "$h")/ystack-plugins" 2>/dev/null || true
+    fi
   fi
 done
 

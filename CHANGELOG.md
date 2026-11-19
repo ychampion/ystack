@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Devin support (Devin Desktop and the `devin` CLI): `./setup` finds Devin (or `--host devin`), installs ystack's skills into Devin's own skills folder, and installs `ystack-guards` as a Devin plugin (`devin/plugins/ystack-guards`) with `push-guard`, `package-bouncer` and `verify` as Devin hooks, registered with `devin plugins install --local` (setup prints the command if the CLI isn't logged in). The guards are the Antigravity scripts, run with `--host devin`; a test keeps the two copies identical. Checked live in Devin: a force-push to `main` and a made-up npm package were refused, and an edit with no test was sent back once for a check.
+- `ystack-guards` (Antigravity): the guards did nothing when their folder was reached through a symlink, which is how `./setup` installs them on macOS and Linux, because the "am I the script being run" check compared the link's path with the resolved one. It now compares real paths.
+- `/ystack-upgrade` now re-runs setup for Antigravity and Devin as well as Claude Code, Codex and OpenCode, so their copies pick up the new version.
+
 - `image-theme` 0.1.2: pictures GDI+ can't open (WebP, and HEIC or AVIF with their Microsoft Store codecs) now work on Windows through Windows Imaging Component; when a picture really can't be read, the message says why in one line instead of a PowerShell error, and toasts no longer repeat the mod's name.
 - `image-theme` 0.1.1: uses only local, absolute picture paths (never network or device paths, which could send Windows credentials to another machine), and on Linux tells ImageMagick which kind of picture to read from the extension.
 
